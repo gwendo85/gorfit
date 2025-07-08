@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Session, Exercise, WeeklyStats } from '@/types'
-import { formatDate, calculateTotalVolume, getWeekStats, calculateStreak } from '@/lib/utils'
+import { formatDate, calculateTotalVolume, calculateVolumeWithType, getWeekStats, calculateStreak } from '@/lib/utils'
+import { getRapidSessionExercises } from '@/lib/rapidSessions'
 import { Plus, LogOut, TrendingUp, Calendar, Dumbbell, Target } from 'lucide-react'
 import CreateSessionForm from '@/components/CreateSessionForm'
+import RapidSessionModal from '@/components/RapidSessionModal'
 import ProgressCharts from '@/components/ProgressCharts'
 import toast from 'react-hot-toast'
 import Tabs from '@/components/Tabs'
@@ -17,6 +19,8 @@ export default function DashboardPage() {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showRapidModal, setShowRapidModal] = useState(false)
+  const [isGeneratingRapidSession, setIsGeneratingRapidSession] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [tab, setTab] = useState(0)
@@ -86,6 +90,69 @@ export default function DashboardPage() {
     loadData()
   }
 
+  const handleRapidSessionSubmit = async (data: { type: string; duration: string }) => {
+    setIsGeneratingRapidSession(true)
+    const supabase = createClient()
+    
+    try {
+      // Récupérer l'utilisateur connecté
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error('Vous devez être connecté')
+        return
+      }
+
+      // Générer la liste d'exercices selon le type et la durée
+      const rapidExercises = getRapidSessionExercises(data.type, data.duration)
+      
+      // Créer la séance
+      const sessionName = `Séance Rapide ${data.type} (${data.duration} min)`
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .insert({
+          user_id: user.id,
+          date: new Date().toISOString().split('T')[0], // Date du jour
+          objectif: `Mode Rapide - ${data.type}`,
+          notes: `Séance générée automatiquement - ${data.duration} minutes`
+        })
+        .select()
+        .single()
+
+      if (sessionError) throw sessionError
+
+      // Créer les exercices
+      const exercisesToInsert = rapidExercises.map(exercise => ({
+        session_id: session.id,
+        name: exercise.name,
+        type: exercise.type,
+        sets: exercise.sets,
+        reps: exercise.reps,
+        weight: exercise.weight,
+        note: exercise.note,
+        completed: false
+      }))
+
+      const { error: exercisesError } = await supabase
+        .from('exercises')
+        .insert(exercisesToInsert)
+
+      if (exercisesError) throw exercisesError
+
+      // Succès : toast + fermeture modal + redirection
+      toast.success('🚀 Ta séance rapide est prête ! Bonne séance !')
+      setShowRapidModal(false)
+      
+      // Redirection vers la séance générée
+      router.push(`/session/${session.id}`)
+      
+    } catch (error: any) {
+      console.error('Erreur lors de la génération de la séance rapide:', error)
+      toast.error(error.message || 'Erreur lors de la génération de la séance')
+    } finally {
+      setIsGeneratingRapidSession(false)
+    }
+  }
+
   const getTotalVolume = () => {
     return exercises.reduce((total, exercise) => {
       return total + (exercise.sets * exercise.reps * exercise.weight)
@@ -152,13 +219,20 @@ export default function DashboardPage() {
           {/* Onglet Planning */}
           {tab === 0 && (
             <>
-              <div className="mb-8 flex justify-end">
+              <div className="mb-8 flex justify-end space-x-4">
                 <button
                   onClick={() => setShowCreateForm(true)}
                   className="flex items-center px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-900 transition-colors shadow-lg"
                 >
                   <Plus className="w-5 h-5 mr-2" />
                   Créer une séance
+                </button>
+                <button
+                  onClick={() => setShowRapidModal(true)}
+                  className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
+                >
+                  <Target className="w-5 h-5 mr-2" />
+                  Mode Rapide (Séance Auto)
                 </button>
               </div>
               <h2 className="text-xl font-bold text-black dark:text-white mb-6">📅 Séances récentes</h2>
@@ -176,7 +250,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {sessions.map((session) => {
                     const sessionExercises = exercises.filter(ex => ex.session_id === session.id)
-                    const totalVolume = calculateTotalVolume(sessionExercises)
+                    const volumeInfo = calculateVolumeWithType(sessionExercises)
                     return (
                       <div
                         key={session.id}
@@ -199,7 +273,12 @@ export default function DashboardPage() {
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600 dark:text-gray-400">Volume total:</span>
-                            <span className="font-medium">{Math.round(totalVolume / 1000)} tonnes</span>
+                            <div className="text-right">
+                              <span className="font-medium">{Math.round(volumeInfo.total / 1000)} tonnes</span>
+                              {volumeInfo.hasBodyWeight && (
+                                <div className="text-xs text-gray-500">*Estimation poids du corps</div>
+                              )}
+                            </div>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600 dark:text-gray-400">Exercices complétés:</span>
@@ -207,12 +286,12 @@ export default function DashboardPage() {
                               {sessionExercises.filter(ex => ex.completed).length}/{sessionExercises.length}
                             </span>
                           </div>
+                          {session.notes && (
+                            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+                              <span className="text-blue-600 dark:text-blue-400 italic">"{session.notes}"</span>
+                            </div>
+                          )}
                         </div>
-                        {session.notes && (
-                          <p className="text-sm text-gray-500 mt-3 italic">
-                            &quot;{session.notes}&quot;
-                          </p>
-                        )}
                       </div>
                     )
                   })}
@@ -275,14 +354,19 @@ export default function DashboardPage() {
 
       {/* Modal de création de séance */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <CreateSessionForm
-              onSessionCreated={handleSessionCreated}
-              onCancel={() => setShowCreateForm(false)}
-            />
-          </div>
-        </div>
+        <CreateSessionForm
+          onSessionCreated={handleSessionCreated}
+          onCancel={() => setShowCreateForm(false)}
+        />
+      )}
+
+      {showRapidModal && (
+        <RapidSessionModal
+          open={showRapidModal}
+          onClose={() => setShowRapidModal(false)}
+          onSubmit={handleRapidSessionSubmit}
+          isLoading={isGeneratingRapidSession}
+        />
       )}
     </div>
   )

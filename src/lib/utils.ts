@@ -12,8 +12,30 @@ export function formatDateTime(date: string | Date): string {
 
 export function calculateTotalVolume(exercises: Exercise[]): number {
   return exercises.reduce((total, exercise) => {
+    if (exercise.weight === null || exercise.weight === undefined) {
+      // Pour les exercices au poids du corps, estimer avec 70kg
+      const estimatedBodyWeight = 70
+      return total + (exercise.sets * exercise.reps * estimatedBodyWeight)
+    }
     return total + (exercise.sets * exercise.reps * exercise.weight)
   }, 0)
+}
+
+export function calculateVolumeWithType(exercises: Exercise[]): { total: number, hasBodyWeight: boolean } {
+  let total = 0
+  let hasBodyWeight = false
+  
+  exercises.forEach(exercise => {
+    if (exercise.weight === null || exercise.weight === undefined) {
+      hasBodyWeight = true
+      const estimatedBodyWeight = 70
+      total += (exercise.sets * exercise.reps * estimatedBodyWeight)
+    } else {
+      total += (exercise.sets * exercise.reps * exercise.weight)
+    }
+  })
+  
+  return { total, hasBodyWeight }
 }
 
 export function calculateTotalReps(exercises: Exercise[]): number {

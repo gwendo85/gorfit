@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Session, Exercise } from '@/types'
-import { formatDate, calculateTotalVolume } from '@/lib/utils'
-import { ArrowLeft, Check, X, Timer } from 'lucide-react'
+import { formatDate, calculateTotalVolume, calculateVolumeWithType } from '@/lib/utils'
+import { ArrowLeft, Check, X, Timer, Share2 } from 'lucide-react'
 import TimerComponent from '@/components/Timer'
 import toast from 'react-hot-toast'
 
@@ -16,6 +16,7 @@ export default function SessionPage() {
   const [showTimer, setShowTimer] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [showCongratulations, setShowCongratulations] = useState(false)
   const router = useRouter()
   const params = useParams()
   const sessionId = params.id as string
@@ -50,6 +51,37 @@ export default function SessionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
 
+  const getProgress = () => {
+    if (exercises.length === 0) return 0
+    const completed = exercises.filter(ex => ex.completed).length
+    return Math.round((completed / exercises.length) * 100)
+  }
+
+  useEffect(() => {
+    const progress = getProgress()
+    if (progress === 100 && !showCongratulations) {
+      // Délai pour l'animation de félicitations
+      setTimeout(() => setShowCongratulations(true), 500)
+    }
+  }, [exercises, showCongratulations])
+
+  const handleShare = () => {
+    const shareText = `🎉 Je viens de terminer ma séance GorFit !\n💪 ${exercises.length} exercices\n⏱️ ${getEstimatedDuration()} minutes\n🏋️ ${Math.round(volumeInfo.total / 1000)} tonnes soulevées\n\n#GorFit #Musculation #Motivation`
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'Ma séance GorFit terminée !',
+        text: shareText,
+        url: window.location.href
+      })
+    } else {
+      // Fallback : copier dans le presse-papier
+      navigator.clipboard.writeText(shareText).then(() => {
+        toast.success('Texte copié ! Tu peux le coller sur tes réseaux sociaux 📱')
+      })
+    }
+  }
+
   const toggleExerciseCompletion = async (exerciseId: string) => {
     setIsUpdating(true)
     const supabase = createClient()
@@ -73,12 +105,6 @@ export default function SessionPage() {
     }
   }
 
-  const getProgress = () => {
-    if (exercises.length === 0) return 0
-    const completed = exercises.filter(ex => ex.completed).length
-    return Math.round((completed / exercises.length) * 100)
-  }
-
   const getCurrentExercise = () => {
     return exercises[currentExerciseIndex] || null
   }
@@ -93,6 +119,13 @@ export default function SessionPage() {
     if (currentExerciseIndex > 0) {
       setCurrentExerciseIndex(currentExerciseIndex - 1)
     }
+  }
+
+  const getEstimatedDuration = () => {
+    // Estimation : 2-3 minutes par série + temps de repos
+    const totalSets = exercises.reduce((total, exercise) => total + exercise.sets, 0)
+    const estimatedMinutes = Math.round(totalSets * 2.5) // 2.5 min par série en moyenne
+    return estimatedMinutes
   }
 
   if (isLoading) {
@@ -123,13 +156,14 @@ export default function SessionPage() {
   }
 
   const totalVolume = calculateTotalVolume(exercises)
+  const volumeInfo = calculateVolumeWithType(exercises)
   const progress = getProgress()
   const currentExercise = getCurrentExercise()
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      {/* Header sticky */}
+      <header className="fixed top-0 left-0 right-0 bg-white shadow-sm border-b z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
@@ -152,202 +186,280 @@ export default function SessionPage() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setShowTimer(!showTimer)}
-                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
+                  showTimer 
+                    ? 'bg-green-600 text-white hover:bg-green-700' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
                 <Timer className="w-4 h-4 mr-2" />
-                Timer
+                {showTimer ? 'Masquer Timer' : 'Afficher Timer'}
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Progression */}
-        <div className="bg-white rounded-lg p-6 shadow-md mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-800">Progression</h2>
-            <span className="text-sm text-gray-600">
-              {exercises.filter(ex => ex.completed).length}/{exercises.length} exercices terminés
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div 
-              className="bg-green-600 h-3 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{progress}%</p>
-              <p className="text-sm text-gray-600">Terminé</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{Math.round(totalVolume / 1000)}</p>
-              <p className="text-sm text-gray-600">Volume (tonnes)</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{exercises.length}</p>
-              <p className="text-sm text-gray-600">Exercices</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Timer */}
+      {/* Contenu avec padding-top pour compenser le header fixe */}
+      <div className="pt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Timer sticky si activé */}
           {showTimer && (
-            <div className="lg:col-span-1">
+            <div className="mb-8">
               <TimerComponent duration={90} onComplete={nextExercise} />
             </div>
           )}
 
-          {/* Exercice en cours */}
-          <div className={`${showTimer ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-            {currentExercise && (
-              <div className="bg-white rounded-lg p-6 shadow-md mb-8">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-2xl font-bold text-gray-800">
-                        {currentExercise.name}
-                      </h3>
-                      <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                        {currentExercise.type}
-                      </span>
+          {/* Statistiques de la séance */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white rounded-lg p-6 shadow-md text-center">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Progression</h3>
+              <div className="text-3xl font-bold text-green-600 mb-2">{progress}%</div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                {exercises.filter(ex => ex.completed).length}/{exercises.length} exercices terminés
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-6 shadow-md text-center">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Volume total</h3>
+              <div className="text-3xl font-bold text-blue-600 mb-2">
+                {Math.round(volumeInfo.total / 1000)} tonnes
+              </div>
+              {volumeInfo.hasBodyWeight && (
+                <p className="text-xs text-gray-500">
+                  * Estimation poids du corps : 70kg
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg p-6 shadow-md text-center">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Exercices</h3>
+              <div className="text-3xl font-bold text-orange-600">{exercises.length}</div>
+              <p className="text-sm text-gray-600">Au total</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-8">
+            {/* Exercice en cours */}
+            <div className="w-full">
+              {currentExercise && (
+                <div className="bg-white rounded-lg p-6 shadow-md mb-8">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="text-2xl font-bold text-gray-800">
+                          {currentExercise.name}
+                        </h3>
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                          {currentExercise.type}
+                        </span>
+                      </div>
+                      <p className="text-gray-600">
+                        Exercice {currentExerciseIndex + 1} sur {exercises.length}
+                      </p>
                     </div>
-                    <p className="text-gray-600">
-                      Exercice {currentExerciseIndex + 1} sur {exercises.length}
-                    </p>
+                    <button
+                      onClick={() => toggleExerciseCompletion(currentExercise.id)}
+                      disabled={isUpdating}
+                      className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
+                        currentExercise.completed
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      {currentExercise.completed ? (
+                        <>
+                          <X className="w-4 h-4 mr-2" />
+                          Annuler
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Terminer
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => toggleExerciseCompletion(currentExercise.id)}
-                    disabled={isUpdating}
-                    className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-                      currentExercise.completed
-                        ? 'bg-red-600 text-white hover:bg-red-700'
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
-                  >
-                    {currentExercise.completed ? (
-                      <>
-                        <X className="w-4 h-4 mr-2" />
-                        Annuler
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Terminer
-                      </>
-                    )}
-                  </button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div className="text-center">
+                      <p className="text-3xl font-bold text-blue-600">{currentExercise.sets}</p>
+                      <p className="text-sm text-gray-600">Séries</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-3xl font-bold text-green-600">{currentExercise.reps}</p>
+                      <p className="text-sm text-gray-600">Répétitions</p>
+                    </div>
+                    <div className="text-center">
+                      {currentExercise.weight !== null && currentExercise.weight !== undefined ? (
+                        <>
+                          <p className="text-3xl font-bold text-orange-600">{currentExercise.weight}kg</p>
+                          <p className="text-sm text-gray-600">Poids</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-2xl font-bold text-purple-600">💪</p>
+                          <p className="text-sm text-gray-600">Poids du corps</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {currentExercise.note && (
+                    <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                      <p className="text-blue-800 font-medium">&quot;{currentExercise.note}&quot;</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between">
+                    <button
+                      onClick={previousExercise}
+                      disabled={currentExerciseIndex === 0}
+                      className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Précédent
+                    </button>
+                    <button
+                      onClick={nextExercise}
+                      disabled={currentExerciseIndex === exercises.length - 1}
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                      Suivant
+                      <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+                    </button>
+                  </div>
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-blue-600">{currentExercise.sets}</p>
-                    <p className="text-sm text-gray-600">Séries</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-green-600">{currentExercise.reps}</p>
-                    <p className="text-sm text-gray-600">Répétitions</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-orange-600">{currentExercise.weight}kg</p>
-                    <p className="text-sm text-gray-600">Poids</p>
-                  </div>
+              {/* Liste des exercices */}
+              <div className="bg-white rounded-lg shadow-md">
+                <div className="p-6 border-b">
+                  <h3 className="text-lg font-semibold text-gray-800">Liste des exercices</h3>
                 </div>
-
-                {currentExercise.note && (
-                  <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                    <p className="text-blue-800 italic">&quot;{currentExercise.note}&quot;</p>
-                  </div>
-                )}
-
-                <div className="flex justify-between">
-                  <button
-                    onClick={previousExercise}
-                    disabled={currentExerciseIndex === 0}
-                    className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Précédent
-                  </button>
-                  <button
-                    onClick={nextExercise}
-                    disabled={currentExerciseIndex === exercises.length - 1}
-                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                  >
-                    Suivant
-                    <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Liste des exercices */}
-            <div className="bg-white rounded-lg shadow-md">
-              <div className="p-6 border-b">
-                <h3 className="text-lg font-semibold text-gray-800">Liste des exercices</h3>
-              </div>
-              <div className="divide-y">
-                {exercises.map((exercise, index) => (
-                  <div
-                    key={exercise.id}
-                    className={`p-6 hover:bg-gray-50 transition-colors cursor-pointer ${
-                      index === currentExerciseIndex ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-                    }`}
-                    onClick={() => setCurrentExerciseIndex(index)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <span className="text-sm text-gray-500">#{index + 1}</span>
-                          <h4 className="font-medium text-gray-800">{exercise.name}</h4>
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            {exercise.type}
-                          </span>
-                          {exercise.completed && (
-                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                              Terminé
+                <div className="divide-y">
+                  {exercises.map((exercise, index) => (
+                    <div
+                      key={exercise.id}
+                      className={`p-6 hover:bg-gray-50 transition-colors cursor-pointer ${
+                        index === currentExerciseIndex ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                      }`}
+                      onClick={() => setCurrentExerciseIndex(index)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-sm text-gray-500">#{index + 1}</span>
+                            <h4 className="font-medium text-gray-800">{exercise.name}</h4>
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                              {exercise.type}
                             </span>
+                            {exercise.completed && (
+                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                Terminé
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {exercise.sets} séries × {exercise.reps} reps 
+                            {exercise.weight !== null && exercise.weight !== undefined 
+                              ? ` @ ${exercise.weight}kg` 
+                              : ' @ Poids du corps'
+                            }
+                          </p>
+                          {exercise.note && (
+                            <p className="text-sm text-blue-600 mt-1 font-medium italic">&quot;{exercise.note}&quot;</p>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {exercise.sets} séries × {exercise.reps} reps @ {exercise.weight}kg
-                        </p>
-                        {exercise.note && (
-                          <p className="text-sm text-gray-500 mt-1 italic">&quot;{exercise.note}&quot;</p>
-                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleExerciseCompletion(exercise.id)
+                          }}
+                          disabled={isUpdating}
+                          className={`ml-4 p-2 rounded-lg transition-colors ${
+                            exercise.completed
+                              ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                              : 'bg-green-100 text-green-600 hover:bg-green-200'
+                          }`}
+                        >
+                          {exercise.completed ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+                        </button>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleExerciseCompletion(exercise.id)
-                        }}
-                        disabled={isUpdating}
-                        className={`ml-4 p-2 rounded-lg transition-colors ${
-                          exercise.completed
-                            ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                            : 'bg-green-100 text-green-600 hover:bg-green-200'
-                        }`}
-                      >
-                        {exercise.completed ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Notes de la séance */}
-        {session.notes && (
-          <div className="mt-8 bg-white rounded-lg p-6 shadow-md">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Notes de la séance</h3>
-            <p className="text-gray-700 italic">&quot;{session.notes}&quot;</p>
+          {/* Notes de la séance */}
+          {session.notes && (
+            <div className="mt-8 bg-white rounded-lg p-6 shadow-md">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Notes de la séance</h3>
+              <p className="text-gray-700 italic">&quot;{session.notes}&quot;</p>
+            </div>
+          )}
+
+          {/* Temps total estimé */}
+          <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 shadow-md text-center">
+            <div className="flex items-center justify-center space-x-2 mb-2">
+              <Timer className="w-5 h-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Temps total estimé</h3>
+            </div>
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {getEstimatedDuration()} min
+            </div>
+            <p className="text-sm text-gray-600">
+              Basé sur {exercises.reduce((total, ex) => total + ex.sets, 0)} séries au total
+            </p>
+            {progress === 100 && (
+              <div className="mt-4 text-green-600 font-medium">
+                🎉 Séance terminée ! Bravo pour ton effort !
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Message de félicitations animé */}
+          {showCongratulations && progress === 100 && (
+            <div className="mt-8 bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 rounded-lg p-8 shadow-lg text-center text-white animate-pulse">
+              <div className="text-6xl mb-4">🎉</div>
+              <h2 className="text-3xl font-bold mb-4">BRAVO !</h2>
+              <p className="text-xl mb-4">Tu as terminé ta séance avec brio !</p>
+              <div className="grid grid-cols-3 gap-4 mb-6 text-center">
+                <div>
+                  <div className="text-2xl font-bold">{exercises.length}</div>
+                  <div className="text-sm opacity-90">Exercices</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{getEstimatedDuration()}</div>
+                  <div className="text-sm opacity-90">Minutes</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{Math.round(volumeInfo.total / 1000)}</div>
+                  <div className="text-sm opacity-90">Tonnes</div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-lg">💪 Continue comme ça, tu es sur la bonne voie !</p>
+                <button
+                  onClick={handleShare}
+                  className="flex items-center justify-center mx-auto px-6 py-3 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                >
+                  <Share2 className="w-5 h-5 mr-2" />
+                  Partager ma réussite
+                </button>
+                <p className="text-sm opacity-75">Reviens demain pour continuer ta progression !</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
