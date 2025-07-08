@@ -18,7 +18,11 @@ export const metadata: Metadata = {
   description: "Application professionnelle de musculation pour planifier, suivre et analyser vos séances d'entraînement",
   keywords: "musculation, fitness, entraînement, séances, progression",
   authors: [{ name: "GorFit Team" }],
-  viewport: "width=device-width, initial-scale=1",
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({
