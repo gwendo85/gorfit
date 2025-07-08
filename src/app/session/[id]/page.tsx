@@ -207,9 +207,14 @@ export default function SessionPage() {
               <div className="bg-white rounded-lg p-6 shadow-md mb-8">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                      {currentExercise.name}
-                    </h3>
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h3 className="text-2xl font-bold text-gray-800">
+                        {currentExercise.name}
+                      </h3>
+                      <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                        {currentExercise.type}
+                      </span>
+                    </div>
                     <p className="text-gray-600">
                       Exercice {currentExerciseIndex + 1} sur {exercises.length}
                     </p>
@@ -298,6 +303,9 @@ export default function SessionPage() {
                         <div className="flex items-center space-x-3">
                           <span className="text-sm text-gray-500">#{index + 1}</span>
                           <h4 className="font-medium text-gray-800">{exercise.name}</h4>
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                            {exercise.type}
+                          </span>
                           {exercise.completed && (
                             <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
                               Terminé

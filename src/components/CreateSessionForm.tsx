@@ -14,10 +14,14 @@ interface CreateSessionFormProps {
   onCancel: () => void
 }
 
+// Remplacer Partial<Exercise> par un type local qui accepte weight: number | null
+type ExerciseWithNullableWeight = Omit<Exercise, 'weight'> & { weight: number | null }
+
 export default function CreateSessionForm({ onSessionCreated, onCancel }: CreateSessionFormProps) {
-  const [exercises, setExercises] = useState<Partial<Exercise>[]>([])
+  const [exercises, setExercises] = useState<Partial<ExerciseWithNullableWeight>[]>([])
   const [showExerciseForm, setShowExerciseForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [exerciseType, setExerciseType] = useState<string>('')
 
   const {
     register: registerSession,
@@ -32,17 +36,21 @@ export default function CreateSessionForm({ onSessionCreated, onCancel }: Create
     register: registerExercise,
     handleSubmit: handleExerciseSubmit,
     formState: { errors: exerciseErrors },
-    reset: resetExercise
+    reset: resetExercise,
+    watch: watchExercise
   } = useForm<ExerciseFormData>({
-    resolver: zodResolver(exerciseSchema)
+    resolver: zodResolver(exerciseSchema) as any
   })
 
+  const watchedType = watchExercise('type')
+
   const addExercise = (data: ExerciseFormData) => {
-    const newExercise: Partial<Exercise> = {
+    const newExercise: Partial<ExerciseWithNullableWeight> = {
       name: data.name,
+      type: data.type,
       sets: data.sets,
       reps: data.reps,
-      weight: data.weight,
+      weight: data.type === 'Poids du corps' ? null : (data.weight ?? null),
       note: data.note,
       completed: false
     }
@@ -90,26 +98,36 @@ export default function CreateSessionForm({ onSessionCreated, onCancel }: Create
       const exercisesToInsert = exercises.map(exercise => ({
         session_id: session.id,
         name: exercise.name!,
+        type: exercise.type!,
         sets: exercise.sets!,
         reps: exercise.reps!,
-        weight: exercise.weight!,
+        weight: exercise.type === 'Poids du corps' ? null : (exercise.weight ?? null),
         note: exercise.note,
         completed: false
       }))
 
-      const { error: exercisesError } = await supabase
+      console.log('Payload envoyé :', exercisesToInsert)
+
+      const { error: exercisesError, data: exercisesData } = await supabase
         .from('exercises')
         .insert(exercisesToInsert)
+        .select()
 
-      if (exercisesError) throw exercisesError
+      if (exercisesError) {
+        console.error('Erreur Supabase :', exercisesError)
+        toast.error(exercisesError.message)
+        return
+      } else {
+        console.log('Insertion réussie :', exercisesData)
+      }
 
       toast.success('Séance créée avec succès !')
       resetSession()
       setExercises([])
       onSessionCreated()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la création de la séance:', error)
-      toast.error('Erreur lors de la création de la séance')
+      toast.error(error.message || 'Erreur lors de la création de la séance')
     } finally {
       setIsSubmitting(false)
     }
@@ -202,9 +220,14 @@ export default function CreateSessionForm({ onSessionCreated, onCancel }: Create
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <h4 className="font-medium text-gray-800">{exercise.name}</h4>
-                  <p className="text-sm text-gray-600">
-                    {exercise.sets} séries × {exercise.reps} reps @ {exercise.weight}kg
-                  </p>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                      {exercise.type}
+                    </span>
+                    <p className="text-sm text-gray-600">
+                      {exercise.sets} séries × {exercise.reps} reps @ {exercise.weight !== null && exercise.weight !== undefined ? `${exercise.weight}kg` : 'Poids du corps'}
+                    </p>
+                  </div>
                   {exercise.note && (
                     <p className="text-sm text-gray-500 mt-1 italic">
                       &quot;{exercise.note}&quot;
@@ -271,18 +294,53 @@ export default function CreateSessionForm({ onSessionCreated, onCancel }: Create
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Poids (kg)
+                  Type d&apos;exercice
                 </label>
-                <input
-                  type="number"
-                  {...registerExercise('weight', { valueAsNumber: true })}
+                <select
+                  {...registerExercise('type', {
+                    onChange: (e) => setExerciseType(e.target.value)
+                  })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0"
-                />
-                {exerciseErrors.weight && (
-                  <p className="text-red-500 text-sm mt-1">{exerciseErrors.weight.message}</p>
+                >
+                  <option value="">Sélectionner un type</option>
+                  <option value="Poids du corps">Poids du corps</option>
+                  <option value="Charges externes">Charges externes</option>
+                </select>
+                {exerciseErrors.type && (
+                  <p className="text-red-500 text-sm mt-1">{exerciseErrors.type.message}</p>
                 )}
               </div>
+
+              {/* Champ poids conditionnel */}
+              {watchedType === 'Charges externes' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Poids (kg)
+                  </label>
+                  <input
+                    type="number"
+                    {...registerExercise('weight', { valueAsNumber: true })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                  {exerciseErrors.weight && (
+                    <p className="text-red-500 text-sm mt-1">{exerciseErrors.weight.message}</p>
+                  )}
+                </div>
+              )}
+              {watchedType === 'Poids du corps' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 text-gray-400">
+                    Poids (kg)
+                  </label>
+                  <input
+                    type="number"
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-200 bg-gray-100 rounded-lg text-gray-400"
+                    placeholder="Non requis"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

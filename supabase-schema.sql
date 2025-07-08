@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.exercises (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     session_id UUID REFERENCES public.sessions(id) ON DELETE CASCADE NOT NULL,
     name TEXT NOT NULL,
+    type TEXT CHECK (type IN ('Poids du corps', 'Charges externes')),
     sets INTEGER NOT NULL,
     reps INTEGER NOT NULL,
     weight DECIMAL(5,2) NOT NULL,

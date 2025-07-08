@@ -18,6 +18,7 @@ export interface Exercise {
   id: string
   session_id: string
   name: string
+  type?: string
   sets: number
   reps: number
   weight: number
