@@ -10,6 +10,7 @@ import TimerComponent from '@/components/Timer'
 import toast from 'react-hot-toast'
 import { Dialog } from '@headlessui/react'
 import { generateExercisesFromTemplate, checkIfExercisesExist } from '@/lib/exerciseGenerator'
+import { checkAndUnlockBadge } from '@/lib/badgeService'
 
 export default function SessionPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -234,6 +235,11 @@ export default function SessionPage() {
             // Si le programme est terminé, afficher un toast spécial
             if (newTotalSessions >= totalSessionsInProgram) {
               toast.success('🎉 Félicitations ! Vous avez terminé le parcours !')
+              // Débloquer le badge/trophée
+              const badgeUnlocked = await checkAndUnlockBadge(session.user_id, session.program_id)
+              if (badgeUnlocked) {
+                toast.success('🏆 Nouveau badge débloqué !')
+              }
             } else {
               toast.success('Séance enregistrée et progression mise à jour !')
             }

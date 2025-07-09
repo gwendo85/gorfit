@@ -286,6 +286,7 @@ export default function DashboardPage() {
             { label: 'Planning', icon: <Calendar className="w-5 h-5" /> },
             { label: 'Statistiques', icon: <BarChart2 className="w-5 h-5" /> },
             { label: 'Progression', icon: <TrendingUp className="w-5 h-5" /> },
+            { label: 'Challenges & Défis', icon: <Trophy className="w-5 h-5" />, disabled: true },
           ]}
           selected={tab}
           onSelect={setTab}
