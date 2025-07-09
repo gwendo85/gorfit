@@ -11,6 +11,7 @@ import toast from 'react-hot-toast'
 import { Dialog } from '@headlessui/react'
 import { generateExercisesFromTemplate, checkIfExercisesExist } from '@/lib/exerciseGenerator'
 import { checkAndUnlockBadge } from '@/lib/badgeService'
+import { updateChallengeProgress } from '@/lib/challengeService'
 
 export default function SessionPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -243,6 +244,9 @@ export default function SessionPage() {
             } else {
               toast.success('Séance enregistrée et progression mise à jour !')
             }
+            
+            // Mettre à jour la progression des challenges
+            await updateChallengeProgress(session.user_id, 'sessions', 1)
           }
         } else {
           toast.success('Séance enregistrée !')

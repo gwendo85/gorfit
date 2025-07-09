@@ -204,3 +204,71 @@ COMMENT ON TABLE public.users IS 'Profils utilisateurs étendus';
 COMMENT ON TABLE public.sessions IS 'Séances d''entraînement';
 COMMENT ON TABLE public.exercises IS 'Exercices dans les séances';
 COMMENT ON TABLE public.progressions IS 'Statistiques de progression hebdomadaire'; 
+
+-- Table pour les préférences de notification utilisateur
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_preferences JSONB DEFAULT '{"in_app": true, "email": true, "push": false}'::jsonb;
+
+-- Table pour le tracking des relances
+CREATE TABLE IF NOT EXISTS challenge_reminders (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  challenge_id UUID REFERENCES challenges(id) ON DELETE CASCADE,
+  channel TEXT NOT NULL CHECK (channel IN ('in_app', 'email', 'push')),
+  sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  clicked_at TIMESTAMP WITH TIME ZONE,
+  resumed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index pour optimiser les requêtes de relance
+CREATE INDEX IF NOT EXISTS idx_challenge_reminders_user_challenge ON challenge_reminders(user_id, challenge_id);
+CREATE INDEX IF NOT EXISTS idx_challenge_reminders_sent_at ON challenge_reminders(sent_at);
+
+-- Fonction pour récupérer les challenges abandonnés depuis X jours
+CREATE OR REPLACE FUNCTION get_abandoned_challenges(days_threshold INTEGER DEFAULT 7)
+RETURNS TABLE (
+  user_id UUID,
+  challenge_id UUID,
+  challenge_title TEXT,
+  progress INTEGER,
+  abandoned_at TIMESTAMP WITH TIME ZONE,
+  notification_preferences JSONB
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    uc.user_id,
+    uc.challenge_id,
+    c.title,
+    uc.progress,
+    uc.updated_at as abandoned_at,
+    u.notification_preferences
+  FROM user_challenges uc
+  JOIN challenges c ON uc.challenge_id = c.id
+  JOIN users u ON uc.user_id = u.id
+  WHERE uc.status = 'abandoned'
+    AND uc.updated_at <= NOW() - INTERVAL '1 day' * days_threshold
+    AND NOT EXISTS (
+      SELECT 1 FROM challenge_reminders cr 
+      WHERE cr.user_id = uc.user_id 
+        AND cr.challenge_id = uc.challenge_id
+        AND cr.sent_at >= NOW() - INTERVAL '1 day' * days_threshold
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+-- Fonction pour reprendre un challenge abandonné
+CREATE OR REPLACE FUNCTION resume_challenge(user_uuid UUID, challenge_uuid UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  UPDATE user_challenges 
+  SET 
+    status = 'in_progress',
+    updated_at = NOW()
+  WHERE user_id = user_uuid 
+    AND challenge_id = challenge_uuid 
+    AND status = 'abandoned';
+  
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql; 

@@ -19,6 +19,9 @@ const eslintConfig = [
       "react-hooks/exhaustive-deps": "warn",
     },
   },
+  {
+    ignores: ["supabase/functions/**/*"]
+  }
 ];
 
 export default eslintConfig;

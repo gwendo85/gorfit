@@ -1,3 +1,5 @@
+"use client"
+
 import BadgeDisplay from '@/components/BadgeDisplay'
 import { createClient } from '@/lib/supabase'
 import { UserBadge } from '@/types/badges'

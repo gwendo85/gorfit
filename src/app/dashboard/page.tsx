@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import Tabs from '@/components/Tabs'
 import RapidSessionModal from '@/components/RapidSessionModal'
 import ProgramBadge from '@/components/ProgramBadge'
+import ChallengesSection from '@/components/ChallengesSection'
 
 export default function DashboardPage() {
   const [sessions, setSessions] = useState<Session[]>([])
@@ -286,7 +287,7 @@ export default function DashboardPage() {
             { label: 'Planning', icon: <Calendar className="w-5 h-5" /> },
             { label: 'Statistiques', icon: <BarChart2 className="w-5 h-5" /> },
             { label: 'Progression', icon: <TrendingUp className="w-5 h-5" /> },
-            { label: 'Challenges & Défis', icon: <Trophy className="w-5 h-5" />, disabled: true },
+            { label: 'Challenges & Défis', icon: <Trophy className="w-5 h-5" /> },
           ]}
           selected={tab}
           onSelect={setTab}
@@ -449,38 +450,38 @@ export default function DashboardPage() {
           {/* Onglet Statistiques */}
           {tab === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md flex flex-col items-center">
+              <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-pink-100 dark:from-yellow-900 dark:via-orange-900 dark:to-pink-900 rounded-lg p-6 shadow-md flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <TrendingUp className="w-6 h-6 text-black dark:text-white" />
                 </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Volume total</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Volume total</p>
                 <p className="text-2xl font-bold text-black dark:text-white">
                   {Math.round(getTotalVolume() / 1000)} tonnes
                 </p>
               </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md flex flex-col items-center">
+              <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-pink-100 dark:from-yellow-900 dark:via-orange-900 dark:to-pink-900 rounded-lg p-6 shadow-md flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <BarChart2 className="w-6 h-6 text-black dark:text-white" />
                 </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Répétitions</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Répétitions</p>
                 <p className="text-2xl font-bold text-black dark:text-white">
                   {getTotalReps().toLocaleString()}
                 </p>
               </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md flex flex-col items-center">
+              <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-pink-100 dark:from-yellow-900 dark:via-orange-900 dark:to-pink-900 rounded-lg p-6 shadow-md flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <Calendar className="w-6 h-6 text-black dark:text-white" />
                 </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Séances</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Séances</p>
                 <p className="text-2xl font-bold text-black dark:text-white">
                   {sessions.length}
                 </p>
               </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md flex flex-col items-center">
+              <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-pink-100 dark:from-yellow-900 dark:via-orange-900 dark:to-pink-900 rounded-lg p-6 shadow-md flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <TrendingUp className="w-6 h-6 text-black dark:text-white" />
                 </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Streak</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Streak</p>
                 <p className="text-2xl font-bold text-black dark:text-white">
                   {getStreak()} jours
                 </p>
@@ -579,6 +580,13 @@ export default function DashboardPage() {
                 </h3>
                 <ProgressCharts weeklyStats={weeklyStats} />
               </div>
+            </div>
+          )}
+
+          {/* Onglet Challenges & Défis */}
+          {tab === 3 && (
+            <div className="space-y-6">
+              <ChallengesSection />
             </div>
           )}
         </div>

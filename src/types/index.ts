@@ -92,4 +92,40 @@ export interface ExerciseTemplate {
   notes?: string
   order_index: number
   created_at: string
+}
+
+// Types pour le système de relance multi-canaux
+export interface NotificationPreferences {
+  in_app: boolean
+  email: boolean
+  push: boolean
+}
+
+export interface ChallengeReminder {
+  id: string
+  user_id: string
+  challenge_id: string
+  channel: 'in_app' | 'email' | 'push'
+  sent_at: string
+  clicked_at?: string
+  resumed_at?: string
+  created_at: string
+}
+
+export interface AbandonedChallenge {
+  user_id: string
+  challenge_id: string
+  challenge_title: string
+  progress: number
+  abandoned_at: string
+  notification_preferences: NotificationPreferences
+}
+
+export interface ReminderPayload {
+  user_id: string
+  channel: string[]
+  title: string
+  body: string
+  action_url: string
+  challenge_id: string
 } 
