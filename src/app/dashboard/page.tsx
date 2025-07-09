@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null)
+  const [user, setUser] = useState<{ id: string; email: string; username?: string } | null>(null)
   const [tab, setTab] = useState(0)
   const router = useRouter()
   const [showRapidModal, setShowRapidModal] = useState(false)
@@ -79,7 +79,13 @@ export default function DashboardPage() {
         return
       }
       
-      setUser({ id: user.id, email: user.email || '' })
+      // Récupérer le username depuis la table users
+      const { data: profile } = await supabase
+        .from('users')
+        .select('username')
+        .eq('id', user.id)
+        .single()
+      setUser({ id: user.id, email: user.email || '', username: profile?.username })
     }
     checkAuth()
     loadData()
@@ -243,10 +249,13 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-black dark:text-white">🏋️ GorFit</h1>
+              <div className="mr-3 p-1.5 rounded-full bg-blue-600 shadow-lg backdrop-blur-md border border-white/30 flex items-center justify-center transition-transform duration-300 hover:scale-110 hover:shadow-[0_0_24px_4px_rgba(37,99,235,0.18)] group h-10 w-10 min-w-[40px] min-h-[40px]">
+                <span className="text-2xl font-extrabold text-black select-none drop-shadow group-hover:text-white transition-colors duration-300">G</span>
+              </div>
+              <h1 className="text-2xl font-bold text-black dark:text-white">GorFit</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600 dark:text-gray-300">Bonjour, {user?.email}</span>
+              <span className="text-gray-600 dark:text-gray-300">Bonjour, {user?.username || user?.email}</span>
               <button
                 onClick={handleLogout}
                 className="flex items-center px-3 py-2 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors"
