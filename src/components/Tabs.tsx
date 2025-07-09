@@ -18,9 +18,10 @@ export default function Tabs({ tabs, selected, onSelect }: TabsProps) {
         <button
           key={i}
           onClick={() => onSelect(i)}
-          className={`flex-1 flex flex-col items-center py-3 px-2 transition-colors
+          className={`flex-1 flex flex-col items-center py-3 px-2 transition-colors rounded-xl mx-1
+            backdrop-blur-md bg-white/40 dark:bg-black/30 border border-white/30 shadow-lg
             ${selected === i
-              ? 'border-b-2 border-black dark:border-white text-black dark:text-white font-semibold bg-gray-100 dark:bg-gray-900'
+              ? 'border-b-2 border-black dark:border-white text-black dark:text-white font-semibold bg-gray-100/70 dark:bg-gray-900/70'
               : 'text-gray-400 hover:text-black dark:hover:text-white'}
           `}
         >

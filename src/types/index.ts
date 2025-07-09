@@ -12,6 +12,9 @@ export interface Session {
   notes?: string
   objectif: string
   created_at: string
+  completed?: boolean
+  volume_estime?: number
+  reps_total?: number
 }
 
 export interface Exercise {

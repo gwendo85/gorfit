@@ -5,9 +5,10 @@ import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Session, Exercise } from '@/types'
 import { formatDate, calculateTotalVolume } from '@/lib/utils'
-import { ArrowLeft, Check, X, Timer } from 'lucide-react'
+import { ArrowLeft, Check, X, Timer, Zap, Save } from 'lucide-react'
 import TimerComponent from '@/components/Timer'
 import toast from 'react-hot-toast'
+import { Dialog } from '@headlessui/react'
 
 export default function SessionPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -16,6 +17,10 @@ export default function SessionPage() {
   const [showTimer, setShowTimer] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isRapidMode, setIsRapidMode] = useState(false)
+  const [rapidTimer, setRapidTimer] = useState(90)
+  const [showEndModal, setShowEndModal] = useState(false)
+  const [isEndLoading, setIsEndLoading] = useState(false)
   const router = useRouter()
   const params = useParams()
   const sessionId = params.id as string
@@ -49,6 +54,13 @@ export default function SessionPage() {
     loadSession()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
+
+  useEffect(() => {
+    if (isRapidMode && exercises.length > 0 && exercises.every(ex => ex.completed)) {
+      setShowEndModal(true)
+      setIsRapidMode(false)
+    }
+  }, [exercises, isRapidMode])
 
   const toggleExerciseCompletion = async (exerciseId: string) => {
     setIsUpdating(true)
@@ -92,6 +104,68 @@ export default function SessionPage() {
   const previousExercise = () => {
     if (currentExerciseIndex > 0) {
       setCurrentExerciseIndex(currentExerciseIndex - 1)
+    }
+  }
+
+  // Fonctions pour le Mode Rapide
+  const toggleRapidMode = () => {
+    setIsRapidMode(!isRapidMode)
+    if (!isRapidMode) {
+      toast.success('Mode Rapide activé ! ⚡')
+    } else {
+      toast.success('Mode Rapide désactivé')
+    }
+  }
+
+  const handleRapidTimerComplete = () => {
+    if (isRapidMode && currentExercise) {
+      toggleExerciseCompletion(currentExercise.id)
+      if (currentExerciseIndex < exercises.length - 1) {
+        nextExercise()
+        toast.success('Exercice terminé automatiquement ! 🚀')
+      } else {
+        toast.success('Séance terminée ! 🎉')
+        setShowEndModal(true)
+        setIsRapidMode(false)
+      }
+    }
+  }
+
+  const startRapidSession = () => {
+    setIsRapidMode(true)
+    setCurrentExerciseIndex(0)
+    toast.success('Mode Rapide démarré ! ⚡')
+  }
+
+  async function handleEndSession(save: boolean) {
+    setIsEndLoading(true)
+    const supabase = createClient()
+    try {
+      if (save) {
+        // Calculs automatiques
+        const calculatedVolume = calculateTotalVolume(exercises)
+        const calculatedReps = exercises.reduce((acc, ex) => acc + (ex.sets * ex.reps), 0)
+        const estimatedDuration = exercises.length * 90 // 90s par exo
+        // Marquer la séance comme terminée et enrichir les stats
+        await supabase.from('sessions').update({
+          completed: true,
+          volume_estime: calculatedVolume,
+          reps_total: calculatedReps,
+          duration_estimate: estimatedDuration
+        }).eq('id', sessionId)
+        // (Ici tu peux ajouter la logique pour mettre à jour une table user_stats si besoin)
+        toast.success('🎉 Séance enregistrée et ajoutée à tes stats !')
+      } else {
+        // Supprimer la séance
+        await supabase.from('sessions').delete().eq('id', sessionId)
+        await supabase.from('exercises').delete().eq('session_id', sessionId)
+        toast('Séance non enregistrée.')
+      }
+      setIsEndLoading(false)
+      router.push('/dashboard')
+    } catch (e) {
+      setIsEndLoading(false)
+      toast.error("Erreur lors de l'opération.")
     }
   }
 
@@ -157,6 +231,13 @@ export default function SessionPage() {
                 <Timer className="w-4 h-4 mr-2" />
                 Timer
               </button>
+              <button
+                onClick={() => setShowEndModal(true)}
+                className="flex items-center px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Enregistrer
+              </button>
             </div>
           </div>
         </div>
@@ -201,8 +282,24 @@ export default function SessionPage() {
             </div>
           )}
 
+          {/* Mode Rapide */}
+          {isRapidMode && (
+            <div className="lg:col-span-1">
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-orange-800">⚡ Mode Rapide</h3>
+                  <span className="text-sm text-orange-600">Auto-complétion</span>
+                </div>
+                <p className="text-sm text-orange-700 mb-3">
+                  Les exercices se terminent automatiquement après le timer
+                </p>
+                <TimerComponent duration={rapidTimer} onComplete={handleRapidTimerComplete} />
+              </div>
+            </div>
+          )}
+
           {/* Exercice en cours */}
-          <div className={`${showTimer ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+          <div className={`${showTimer || isRapidMode ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
             {currentExercise && (
               <div className="bg-white rounded-lg p-6 shadow-md mb-8">
                 <div className="flex justify-between items-start mb-6">
@@ -214,6 +311,12 @@ export default function SessionPage() {
                       <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
                         {currentExercise.type}
                       </span>
+                      {isRapidMode && (
+                        <span className="px-3 py-1 bg-orange-100 text-orange-800 text-sm rounded-full flex items-center">
+                          <Zap className="w-3 h-3 mr-1" />
+                          Mode Rapide
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-600">
                       Exercice {currentExerciseIndex + 1} sur {exercises.length}
@@ -349,6 +452,32 @@ export default function SessionPage() {
           </div>
         )}
       </div>
+      <Dialog open={showEndModal} onClose={() => router.push('/dashboard')} className="fixed z-50 inset-0 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+        <div className="bg-white rounded-xl shadow-xl p-8 z-50 max-w-md mx-auto flex flex-col items-center">
+          <div className="text-5xl mb-4">✅</div>
+          <Dialog.Title className="text-xl font-bold mb-2 text-center">Enregistrer cette séance&nbsp;?</Dialog.Title>
+          <Dialog.Description className="mb-6 text-center text-gray-700">
+            Souhaites-tu enregistrer cette séance dans ton planning pour suivre ta progression&nbsp;?
+          </Dialog.Description>
+          <div className="flex w-full gap-4">
+            <button
+              className="flex-1 px-4 py-2 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition-colors text-base font-medium"
+              onClick={() => handleEndSession(false)}
+              disabled={isEndLoading}
+            >
+              Non, retour
+            </button>
+            <button
+              className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors text-base font-medium"
+              onClick={() => handleEndSession(true)}
+              disabled={isEndLoading}
+            >
+              Oui, enregistrer
+            </button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   )
 } 
