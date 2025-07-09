@@ -270,9 +270,9 @@ export default function DashboardPage() {
               <button
                 onClick={handleLogout}
                 className="flex items-center px-3 py-2 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors"
+                title="Déconnexion"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Déconnexion
+                <LogOut className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -301,7 +301,7 @@ export default function DashboardPage() {
                   onClick={() => setShowCreateForm(true)}
                   className="flex items-center px-6 py-3 rounded-xl bg-black/70 text-white shadow-lg backdrop-blur-md border border-white/20 hover:bg-black transition-colors"
                 >
-                  <Plus className="w-5 h-5 mr-2" />
+                  <Plus className="w-5 h-5 mr-3" />
                   Créer une séance
                 </button>
                 <button
@@ -309,14 +309,14 @@ export default function DashboardPage() {
                   disabled={isRapidLoading}
                   className="flex items-center px-6 py-3 rounded-xl bg-blue-600/80 text-white shadow-lg backdrop-blur-md border border-white/20 hover:bg-blue-700 transition-colors disabled:opacity-60"
                 >
-                  <Zap className="w-5 h-5 mr-2" />
+                  <Zap className="w-5 h-5 mr-3" />
                   Mode Rapide (Séance Auto)
                 </button>
                 <button
                   onClick={() => router.push('/programs')}
                   className="flex items-center px-6 py-3 rounded-xl bg-purple-600/80 text-white shadow-lg backdrop-blur-md border border-white/20 hover:bg-purple-700 transition-colors"
                 >
-                  <Trophy className="w-5 h-5 mr-2" />
+                  <Trophy className="w-5 h-5 mr-3" />
                   Parcours GorFit
                 </button>
               </div>
@@ -362,7 +362,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   {sessions.map((session) => {
                     const sessionExercises = exercises.filter(ex => ex.session_id === session.id)
                     const totalVolume = calculateTotalVolume(sessionExercises)
@@ -371,7 +371,7 @@ export default function DashboardPage() {
                       <div
                         key={session.id}
                         onClick={() => router.push(`/session/${session.id}`)}
-                        className={`bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow cursor-pointer border ${color.border} dark:border-gray-800`}
+                        className={`bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6 shadow-md hover:shadow-lg transition-shadow cursor-pointer border ${color.border} dark:border-gray-800`}
                       >
                         <div className="flex justify-between items-start mb-4">
                           <div>
@@ -381,15 +381,42 @@ export default function DashboardPage() {
                             <p className={`text-sm capitalize ${color.text}`}>
                               {session.objectif}
                             </p>
+                            {session.program_id && (
+                              <div className="mt-2">
+                                <div className="flex items-center space-x-2 text-xs">
+                                  <span className={`${color.text} opacity-75`}>
+                                    {session.program_week && session.program_session 
+                                      ? `Semaine ${session.program_week}/5 • Séance ${session.program_session}/4`
+                                      : 'Parcours en cours'
+                                    }
+                                  </span>
+                                  {session.program_week === 5 && session.program_session === 4 && (
+                                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full flex items-center">
+                                      🏆 Bientôt terminé
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-1 w-full bg-gray-200 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-purple-500 h-1.5 rounded-full transition-all duration-300"
+                                    style={{ 
+                                      width: `${session.program_week && session.program_session 
+                                        ? ((session.program_week - 1) * 4 + session.program_session) / 20 * 100
+                                        : 0}%` 
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center space-x-2">
                             {session.completed && (
-                              <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full flex items-center">
+                              <span className="px-3 py-1 bg-red-500 text-white text-xs rounded-full flex items-center">
                                 <Check className="w-3 h-3 mr-1" />
                                 Terminée
                               </span>
                             )}
-                            <span className={`px-2 py-1 text-xs rounded-full ${color.badge}`}>
+                            <span className={`px-3 py-1 text-xs rounded-full ${color.badge}`}>
                               {sessionExercises.length} exercices
                             </span>
                           </div>
