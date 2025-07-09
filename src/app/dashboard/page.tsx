@@ -3,20 +3,21 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Session, Exercise, WeeklyStats } from '@/types'
+import { Session, Exercise, WeeklyStats, UserProgram } from '@/types'
 import { formatDate, calculateTotalVolume, getWeekStats, calculateStreak } from '@/lib/utils'
-import { Plus, LogOut, TrendingUp, Calendar, Dumbbell, Target, Check, Zap } from 'lucide-react'
+import { ArrowLeft, Plus, LogOut, Calendar, BarChart2, TrendingUp, Zap, Trophy, Check, Dumbbell, Target } from 'lucide-react'
 import CreateSessionForm from '@/components/CreateSessionForm'
 import ProgressCharts from '@/components/ProgressCharts'
 import toast from 'react-hot-toast'
 import Tabs from '@/components/Tabs'
-import { BarChart2 } from 'lucide-react'
 import RapidSessionModal from '@/components/RapidSessionModal'
+import ProgramBadge from '@/components/ProgramBadge'
 
 export default function DashboardPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats[]>([])
+  const [userPrograms, setUserPrograms] = useState<UserProgram[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<{ id: string; email: string; username?: string } | null>(null)
@@ -112,8 +113,18 @@ export default function DashboardPage() {
         .select('*')
         .in('session_id', sessionsData?.map(s => s.id) || [])
 
+      // Charger les programmes de l'utilisateur
+      const { data: userProgramsData } = await supabase
+        .from('user_programs')
+        .select(`
+          *,
+          program:workout_programs(*)
+        `)
+        .eq('user_id', user.id)
+
       if (sessionsData) setSessions(sessionsData)
       if (exercisesData) setExercises(exercisesData)
+      if (userProgramsData) setUserPrograms(userProgramsData || [])
 
       // Calculer les statistiques hebdomadaires
       if (sessionsData && exercisesData) {
@@ -300,6 +311,13 @@ export default function DashboardPage() {
                   <Zap className="w-5 h-5 mr-2" />
                   Mode Rapide (Séance Auto)
                 </button>
+                <button
+                  onClick={() => router.push('/programs')}
+                  className="flex items-center px-6 py-3 rounded-xl bg-purple-600/80 text-white shadow-lg backdrop-blur-md border border-white/20 hover:bg-purple-700 transition-colors"
+                >
+                  <Trophy className="w-5 h-5 mr-2" />
+                  Parcours GorFit
+                </button>
               </div>
               <RapidSessionModal
                 open={showRapidModal}
@@ -444,9 +462,95 @@ export default function DashboardPage() {
 
           {/* Onglet Progression */}
           {tab === 2 && (
-            <div>
-              <h2 className="text-xl font-bold text-black dark:text-white mb-6">📈 Progression hebdomadaire</h2>
-              <ProgressCharts weeklyStats={weeklyStats} />
+            <div className="space-y-8">
+              {/* Statistiques générales */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Volume total</p>
+                      <p className="text-2xl font-bold text-black dark:text-white">
+                        {Math.round(getTotalVolume() / 1000)} tonnes
+                      </p>
+                    </div>
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                      <TrendingUp className="w-6 h-6 text-blue-600" />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Répétitions totales</p>
+                      <p className="text-2xl font-bold text-black dark:text-white">
+                        {getTotalReps().toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                      <Dumbbell className="w-6 h-6 text-green-600" />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Série actuelle</p>
+                      <p className="text-2xl font-bold text-black dark:text-white">
+                        {getStreak()} jours
+                      </p>
+                    </div>
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                      <Target className="w-6 h-6 text-orange-600" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Badges de parcours terminés */}
+              <div>
+                <h3 className="text-lg font-semibold text-black dark:text-white mb-6 flex items-center">
+                  <Trophy className="w-5 h-5 mr-2 text-yellow-600" />
+                  Parcours terminés
+                </h3>
+                
+                {userPrograms.filter(up => up.completed_at).length === 0 ? (
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-8 text-center">
+                    <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                      Aucun parcours terminé pour le moment
+                    </p>
+                    <button
+                      onClick={() => router.push('/programs')}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Découvrir les parcours
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {userPrograms
+                      .filter(up => up.completed_at)
+                      .map((userProgram) => (
+                        <ProgramBadge
+                          key={userProgram.id}
+                          programName={userProgram.program?.name || 'Parcours inconnu'}
+                          completedAt={userProgram.completed_at!}
+                          isNew={new Date(userProgram.completed_at!).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000}
+                        />
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Graphiques de progression */}
+              <div>
+                <h3 className="text-lg font-semibold text-black dark:text-white mb-6">
+                  Évolution de vos performances
+                </h3>
+                <ProgressCharts weeklyStats={weeklyStats} />
+              </div>
             </div>
           )}
         </div>

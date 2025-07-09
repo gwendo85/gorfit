@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Session, Exercise } from '@/types'
+import { Session, Exercise, ExerciseTemplate } from '@/types'
 import { formatDate, calculateTotalVolume } from '@/lib/utils'
 import { ArrowLeft, Check, X, Timer, Zap, Save } from 'lucide-react'
 import TimerComponent from '@/components/Timer'
 import toast from 'react-hot-toast'
 import { Dialog } from '@headlessui/react'
+import { generateExercisesFromTemplate, checkIfExercisesExist } from '@/lib/exerciseGenerator'
 
 export default function SessionPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -21,6 +22,8 @@ export default function SessionPage() {
   const [rapidTimer, setRapidTimer] = useState(90)
   const [showEndModal, setShowEndModal] = useState(false)
   const [isEndLoading, setIsEndLoading] = useState(false)
+  const [templateExercises, setTemplateExercises] = useState<ExerciseTemplate[]>([])
+  const [showTemplateFallback, setShowTemplateFallback] = useState(false)
   const router = useRouter()
   const params = useParams()
   const sessionId = params.id as string
@@ -29,20 +32,53 @@ export default function SessionPage() {
     const loadSession = async () => {
       const supabase = createClient()
       try {
+        // 1. Charger la séance
         const { data: sessionData, error: sessionError } = await supabase
           .from('sessions')
           .select('*')
           .eq('id', sessionId)
           .single()
         if (sessionError) throw sessionError
-        const { data: exercisesData, error: exercisesError } = await supabase
-          .from('exercises')
-          .select('*')
-          .eq('session_id', sessionId)
-          .order('created_at', { ascending: true })
-        if (exercisesError) throw exercisesError
         setSession(sessionData)
-        setExercises(exercisesData || [])
+
+        // 2. Vérifier si des exercices existent déjà
+        const exercisesExist = await checkIfExercisesExist(sessionId)
+        
+        if (!exercisesExist && sessionData.program_id && sessionData.program_week && sessionData.program_session) {
+          // 3. Générer automatiquement les exercices à partir des templates
+          console.log('Génération automatique des exercices...')
+          const generatedExercises = await generateExercisesFromTemplate(
+            sessionId,
+            sessionData.program_id,
+            sessionData.program_week,
+            sessionData.program_session
+          )
+          if (generatedExercises.length > 0) {
+            setExercises(generatedExercises)
+          } else {
+            // Fallback : charger les templates pour affichage seul
+            const { data: templates, error: templatesError } = await supabase
+              .from('exercise_templates')
+              .select('*')
+              .eq('program_id', sessionData.program_id)
+              .eq('week_number', sessionData.program_week)
+              .eq('session_number', sessionData.program_session)
+              .order('order_index')
+            if (!templatesError && templates && templates.length > 0) {
+              setTemplateExercises(templates)
+              setShowTemplateFallback(true)
+            }
+          }
+        } else {
+          // 4. Charger les exercices existants
+          const { data: exercisesData, error: exercisesError } = await supabase
+            .from('exercises')
+            .select('*')
+            .eq('session_id', sessionId)
+            .order('created_at', { ascending: true })
+          if (exercisesError) throw exercisesError
+          setExercises(exercisesData || [])
+        }
       } catch (error) {
         console.error('Erreur lors du chargement de la séance:', error)
         toast.error('Erreur lors du chargement de la séance')
@@ -139,33 +175,92 @@ export default function SessionPage() {
 
   async function handleEndSession(save: boolean) {
     setIsEndLoading(true)
-    const supabase = createClient()
     try {
-      if (save) {
-        // Calculs automatiques
-        const calculatedVolume = calculateTotalVolume(exercises)
-        const calculatedReps = exercises.reduce((acc, ex) => acc + (ex.sets * ex.reps), 0)
-        const estimatedDuration = exercises.length * 90 // 90s par exo
-        // Marquer la séance comme terminée et enrichir les stats
-        await supabase.from('sessions').update({
-          completed: true,
-          volume_estime: calculatedVolume,
-          reps_total: calculatedReps,
-          duration_estimate: estimatedDuration
-        }).eq('id', sessionId)
-        // (Ici tu peux ajouter la logique pour mettre à jour une table user_stats si besoin)
-        toast.success('🎉 Séance enregistrée et ajoutée à tes stats !')
-      } else {
-        // Supprimer la séance
-        await supabase.from('sessions').delete().eq('id', sessionId)
-        await supabase.from('exercises').delete().eq('session_id', sessionId)
-        toast('Séance non enregistrée.')
+      const supabase = createClient()
+      
+      if (!session) {
+        toast.error('Séance non trouvée')
+        return
       }
+      
+      if (save) {
+        // Marquer la séance comme terminée
+        const { error: sessionError } = await supabase
+          .from('sessions')
+          .update({ completed: true })
+          .eq('id', sessionId)
+
+        if (sessionError) throw sessionError
+
+        // Si c'est une séance de programme, mettre à jour la progression
+        if (session?.program_id) {
+          // Récupérer le programme de l'utilisateur
+          const { data: userProgram, error: userProgramError } = await supabase
+            .from('user_programs')
+            .select('*')
+            .eq('user_id', session.user_id)
+            .eq('program_id', session.program_id)
+            .single()
+
+          if (userProgramError) throw userProgramError
+
+          if (userProgram) {
+            // Mettre à jour la progression
+            const newTotalSessions = userProgram.total_sessions_completed + 1
+            const totalSessionsInProgram = userProgram.program?.duration_weeks * userProgram.program?.sessions_per_week || 0
+
+            // Calculer la prochaine séance
+            let nextWeek = userProgram.current_week
+            let nextSession = userProgram.current_session + 1
+
+            if (nextSession > (userProgram.program?.sessions_per_week || 0)) {
+              nextSession = 1
+              nextWeek = userProgram.current_week + 1
+            }
+
+            // Mettre à jour user_programs
+            const { error: updateError } = await supabase
+              .from('user_programs')
+              .update({
+                total_sessions_completed: newTotalSessions,
+                current_week: nextWeek,
+                current_session: nextSession,
+                completed_at: newTotalSessions >= totalSessionsInProgram ? new Date().toISOString() : null
+              })
+              .eq('id', userProgram.id)
+
+            if (updateError) throw updateError
+
+            // Si le programme est terminé, afficher un toast spécial
+            if (newTotalSessions >= totalSessionsInProgram) {
+              toast.success('🎉 Félicitations ! Vous avez terminé le parcours !')
+            } else {
+              toast.success('Séance enregistrée et progression mise à jour !')
+            }
+          }
+        } else {
+          toast.success('Séance enregistrée !')
+        }
+
+        router.push('/dashboard')
+              } else {
+          // Supprimer la séance si elle fait partie d'un programme
+          if (session?.program_id) {
+            const { error: deleteError } = await supabase
+              .from('sessions')
+              .delete()
+              .eq('id', sessionId)
+
+            if (deleteError) throw deleteError
+          }
+
+        router.push('/dashboard')
+      }
+    } catch (error: any) {
+      toast.error('Erreur lors de l\'enregistrement de la séance')
+      console.error(error)
+    } finally {
       setIsEndLoading(false)
-      router.push('/dashboard')
-    } catch (e) {
-      setIsEndLoading(false)
-      toast.error("Erreur lors de l'opération.")
     }
   }
 
@@ -392,54 +487,69 @@ export default function SessionPage() {
               <div className="p-6 border-b">
                 <h3 className="text-lg font-semibold text-gray-800">Liste des exercices</h3>
               </div>
-              <div className="divide-y">
-                {exercises.map((exercise, index) => (
-                  <div
-                    key={exercise.id}
-                    className={`p-6 hover:bg-gray-50 transition-colors cursor-pointer ${
-                      index === currentExerciseIndex ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-                    }`}
-                    onClick={() => setCurrentExerciseIndex(index)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <span className="text-sm text-gray-500">#{index + 1}</span>
-                          <h4 className="font-medium text-gray-800">{exercise.name}</h4>
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            {exercise.type}
-                          </span>
-                          {exercise.completed && (
-                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                              Terminé
+              {showTemplateFallback ? (
+                <div className="rounded border p-4 bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-200">
+                  <p className="mb-2 text-sm text-yellow-600 dark:text-yellow-400">Aucun exercice réel n'a encore été créé pour cette séance.<br/>Voici la liste des exercices à faire selon le programme :</p>
+                  <ul>
+                    {templateExercises.map((ex, idx) => (
+                      <li key={ex.id || idx} className="py-2 border-b last:border-b-0 flex flex-col gap-1">
+                        <span className="font-semibold">{ex.exercise_name}</span>
+                        <span className="text-xs">{ex.exercise_type} &bull; {ex.sets} x {ex.reps} {ex.weight ? `&bull; ${ex.weight} kg` : ''}</span>
+                        {ex.notes && <span className="text-xs italic text-gray-500">{ex.notes}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {exercises.map((exercise, index) => (
+                    <div
+                      key={exercise.id}
+                      className={`p-6 hover:bg-gray-50 transition-colors cursor-pointer ${
+                        index === currentExerciseIndex ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                      }`}
+                      onClick={() => setCurrentExerciseIndex(index)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-sm text-gray-500">#{index + 1}</span>
+                            <h4 className="font-medium text-gray-800">{exercise.name}</h4>
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                              {exercise.type}
                             </span>
+                            {exercise.completed && (
+                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                Terminé
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {exercise.sets} séries × {exercise.reps} reps @ {exercise.weight}kg
+                          </p>
+                          {exercise.note && (
+                            <p className="text-sm text-gray-500 mt-1 italic">&quot;{exercise.note}&quot;</p>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {exercise.sets} séries × {exercise.reps} reps @ {exercise.weight}kg
-                        </p>
-                        {exercise.note && (
-                          <p className="text-sm text-gray-500 mt-1 italic">&quot;{exercise.note}&quot;</p>
-                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleExerciseCompletion(exercise.id)
+                          }}
+                          disabled={isUpdating}
+                          className={`ml-4 p-2 rounded-lg transition-colors ${
+                            exercise.completed
+                              ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                              : 'bg-green-100 text-green-600 hover:bg-green-200'
+                          }`}
+                        >
+                          {exercise.completed ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+                        </button>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleExerciseCompletion(exercise.id)
-                        }}
-                        disabled={isUpdating}
-                        className={`ml-4 p-2 rounded-lg transition-colors ${
-                          exercise.completed
-                            ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                            : 'bg-green-100 text-green-600 hover:bg-green-200'
-                        }`}
-                      >
-                        {exercise.completed ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />}
-                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
