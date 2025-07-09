@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Session, Exercise } from '@/types'
 import { formatDate, calculateTotalVolume, calculateVolumeWithType } from '@/lib/utils'
+import { saveCompletedSession } from '@/lib/sessionUtils'
 import { ArrowLeft, Check, X, Timer, Share2 } from 'lucide-react'
 import TimerComponent from '@/components/Timer'
 import toast from 'react-hot-toast'
@@ -17,6 +18,8 @@ export default function SessionPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showCongratulations, setShowCongratulations] = useState(false)
+  const [isSavingSession, setIsSavingSession] = useState(false)
+  const [sessionSaved, setSessionSaved] = useState(false)
   const router = useRouter()
   const params = useParams()
   const sessionId = params.id as string
@@ -57,11 +60,52 @@ export default function SessionPage() {
     return Math.round((completed / exercises.length) * 100)
   }
 
+  const getTotalReps = () => {
+    return exercises.reduce((total, exercise) => total + (exercise.sets * exercise.reps), 0)
+  }
+
+  const getEstimatedDuration = () => {
+    // Estimation : 2-3 minutes par série + temps de repos
+    const totalSets = exercises.reduce((total, exercise) => total + exercise.sets, 0)
+    const estimatedMinutes = Math.round(totalSets * 2.5) // 2.5 min par série en moyenne
+    return estimatedMinutes
+  }
+
+  const handleSessionCompletion = async () => {
+    if (!session || sessionSaved) return
+    
+    setIsSavingSession(true)
+    
+    try {
+      const result = await saveCompletedSession({
+        sessionId,
+        exercises,
+        session
+      })
+
+      if (result.success) {
+        setSessionSaved(true)
+        toast.success(result.message)
+      } else {
+        toast.error(result.message)
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error)
+      toast.error('Erreur lors de la sauvegarde de la séance')
+    } finally {
+      setIsSavingSession(false)
+    }
+  }
+
   useEffect(() => {
     const progress = getProgress()
     if (progress === 100 && !showCongratulations) {
       // Délai pour l'animation de félicitations
-      setTimeout(() => setShowCongratulations(true), 500)
+      setTimeout(() => {
+        setShowCongratulations(true)
+        // Sauvegarder automatiquement la séance
+        handleSessionCompletion()
+      }, 500)
     }
   }, [exercises, showCongratulations])
 
@@ -121,13 +165,6 @@ export default function SessionPage() {
     }
   }
 
-  const getEstimatedDuration = () => {
-    // Estimation : 2-3 minutes par série + temps de repos
-    const totalSets = exercises.reduce((total, exercise) => total + exercise.sets, 0)
-    const estimatedMinutes = Math.round(totalSets * 2.5) // 2.5 min par série en moyenne
-    return estimatedMinutes
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -181,9 +218,20 @@ export default function SessionPage() {
                 <p className="text-sm text-gray-600 capitalize">
                   Objectif: {session.objectif}
                 </p>
+                {sessionSaved && (
+                  <p className="text-xs text-green-600 font-medium">
+                    ✅ Séance sauvegardée dans ton historique
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              {isSavingSession && (
+                <div className="flex items-center text-blue-600 text-sm">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                  Sauvegarde...
+                </div>
+              )}
               <button
                 onClick={() => setShowTimer(!showTimer)}
                 className={`flex items-center px-3 py-2 rounded-lg transition-colors ${

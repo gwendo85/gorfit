@@ -3,170 +3,95 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Session, Exercise, WeeklyStats } from '@/types'
-import { formatDate, calculateTotalVolume, calculateVolumeWithType, getWeekStats, calculateStreak } from '@/lib/utils'
-import { getRapidSessionExercises } from '@/lib/rapidSessions'
-import { Plus, LogOut, TrendingUp, Calendar, Dumbbell, Target } from 'lucide-react'
+import { Session, Exercise, UserStats } from '@/types'
+import { formatDate, calculateTotalVolume } from '@/lib/utils'
+import { getUserStats } from '@/lib/sessionUtils'
+import { Plus, Calendar, BarChart3, Settings, LogOut, CheckCircle, Clock } from 'lucide-react'
 import CreateSessionForm from '@/components/CreateSessionForm'
-import RapidSessionModal from '@/components/RapidSessionModal'
-import ProgressCharts from '@/components/ProgressCharts'
 import toast from 'react-hot-toast'
-import Tabs from '@/components/Tabs'
-import { BarChart2 } from 'lucide-react'
 
 export default function DashboardPage() {
   const [sessions, setSessions] = useState<Session[]>([])
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats[]>([])
+  const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [showRapidModal, setShowRapidModal] = useState(false)
-  const [isGeneratingRapidSession, setIsGeneratingRapidSession] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null)
-  const [tab, setTab] = useState(0)
+  const [user, setUser] = useState<any>(null)
   const router = useRouter()
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const loadDashboard = async () => {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
       
-      if (!user) {
-        router.push('/auth')
-        return
+      try {
+        // Récupérer l'utilisateur
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+          router.push('/auth')
+          return
+        }
+        setUser(user)
+
+        // Charger les séances
+        const { data: sessionsData, error: sessionsError } = await supabase
+          .from('sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false })
+          .limit(10)
+
+        if (sessionsError) throw sessionsError
+        setSessions(sessionsData || [])
+
+        // Charger les statistiques utilisateur
+        const stats = await getUserStats()
+        setUserStats(stats)
+
+      } catch (error) {
+        console.error('Erreur lors du chargement du dashboard:', error)
+        toast.error('Erreur lors du chargement du dashboard')
+      } finally {
+        setIsLoading(false)
       }
-      
-      setUser({ id: user.id, email: user.email || '' })
     }
-    checkAuth()
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
-  const loadData = async () => {
-    const supabase = createClient()
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+    loadDashboard()
+  }, [router])
 
-      // Charger les séances
-      const { data: sessionsData } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
-
-      // Charger les exercices
-      const { data: exercisesData } = await supabase
-        .from('exercises')
-        .select('*')
-        .in('session_id', sessionsData?.map(s => s.id) || [])
-
-      if (sessionsData) setSessions(sessionsData)
-      if (exercisesData) setExercises(exercisesData)
-
-      // Calculer les statistiques hebdomadaires
-      if (sessionsData && exercisesData) {
-        const stats = getWeekStats(sessionsData, exercisesData)
-        setWeeklyStats(stats)
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des données:', error)
-      toast.error('Erreur lors du chargement des données')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/auth')
   }
 
-  const handleSessionCreated = () => {
+  const handleSessionCreated = (newSession: Session) => {
+    setSessions([newSession, ...sessions])
     setShowCreateForm(false)
-    loadData()
+    toast.success('Séance créée avec succès !')
   }
 
-  const handleRapidSessionSubmit = async (data: { type: string; duration: string }) => {
-    setIsGeneratingRapidSession(true)
-    const supabase = createClient()
-    
-    try {
-      // Récupérer l'utilisateur connecté
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        toast.error('Vous devez être connecté')
-        return
+  const getSessionStatus = (session: Session) => {
+    if (session.completed) {
+      return { 
+        status: 'Terminée', 
+        icon: <CheckCircle className="w-4 h-4" />, 
+        color: 'bg-green-100 text-green-800',
+        bgColor: 'bg-green-50'
       }
-
-      // Générer la liste d'exercices selon le type et la durée
-      const rapidExercises = getRapidSessionExercises(data.type, data.duration)
-      
-      // Créer la séance
-      const sessionName = `Séance Rapide ${data.type} (${data.duration} min)`
-      const { data: session, error: sessionError } = await supabase
-        .from('sessions')
-        .insert({
-          user_id: user.id,
-          date: new Date().toISOString().split('T')[0], // Date du jour
-          objectif: `Mode Rapide - ${data.type}`,
-          notes: `Séance générée automatiquement - ${data.duration} minutes`
-        })
-        .select()
-        .single()
-
-      if (sessionError) throw sessionError
-
-      // Créer les exercices
-      const exercisesToInsert = rapidExercises.map(exercise => ({
-        session_id: session.id,
-        name: exercise.name,
-        type: exercise.type,
-        sets: exercise.sets,
-        reps: exercise.reps,
-        weight: exercise.weight,
-        note: exercise.note,
-        completed: false
-      }))
-
-      const { error: exercisesError } = await supabase
-        .from('exercises')
-        .insert(exercisesToInsert)
-
-      if (exercisesError) throw exercisesError
-
-      // Succès : toast + fermeture modal + redirection
-      toast.success('🚀 Ta séance rapide est prête ! Bonne séance !')
-      setShowRapidModal(false)
-      
-      // Redirection vers la séance générée
-      router.push(`/session/${session.id}`)
-      
-    } catch (error: any) {
-      console.error('Erreur lors de la génération de la séance rapide:', error)
-      toast.error(error.message || 'Erreur lors de la génération de la séance')
-    } finally {
-      setIsGeneratingRapidSession(false)
+    }
+    return { 
+      status: 'En cours', 
+      icon: <Clock className="w-4 h-4" />, 
+      color: 'bg-blue-100 text-blue-800',
+      bgColor: 'bg-blue-50'
     }
   }
 
+  const getCompletedSessionsCount = () => {
+    return sessions.filter(s => s.completed).length
+  }
+
   const getTotalVolume = () => {
-    return exercises.reduce((total, exercise) => {
-      return total + (exercise.sets * exercise.reps * exercise.weight)
-    }, 0)
-  }
-
-  const getTotalReps = () => {
-    return exercises.reduce((total, exercise) => {
-      return total + (exercise.sets * exercise.reps)
-    }, 0)
-  }
-
-  const getStreak = () => {
-    return calculateStreak(sessions)
+    return userStats ? Math.round(userStats.total_volume / 1000) : 0
   }
 
   if (isLoading) {
@@ -174,26 +99,33 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement...</p>
+          <p className="mt-4 text-gray-600">Chargement du dashboard...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white dark:bg-black shadow-sm border-b border-gray-200 dark:border-gray-800">
+      <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-black dark:text-white">🏋️ GorFit</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">GorFit</h1>
+              <p className="text-sm text-gray-600">Ton coach fitness personnel</p>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600 dark:text-gray-300">Bonjour, {user?.email}</span>
               <button
-                onClick={handleLogout}
-                className="flex items-center px-3 py-2 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors"
+                onClick={() => router.push('/statistics')}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Statistiques
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Déconnexion
@@ -203,171 +135,188 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
-        {/* Onglets */}
-        <Tabs
-          tabs={[
-            { label: 'Planning', icon: <Calendar className="w-5 h-5" /> },
-            { label: 'Statistiques', icon: <BarChart2 className="w-5 h-5" /> },
-            { label: 'Progression', icon: <TrendingUp className="w-5 h-5" /> },
-          ]}
-          selected={tab}
-          onSelect={setTab}
-        />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Statistiques rapides */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-lg p-6 shadow-md text-center">
+            <div className="flex items-center justify-center mb-4">
+              <Calendar className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Séances Terminées</h3>
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {userStats?.sessions_completed || 0}
+            </div>
+            <p className="text-sm text-gray-600">
+              Bravo pour ta régularité !
+            </p>
+          </div>
 
-        <div className="mt-6">
-          {/* Onglet Planning */}
-          {tab === 0 && (
-            <>
-              <div className="mb-8 flex justify-end space-x-4">
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  className="flex items-center px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-900 transition-colors shadow-lg"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Créer une séance
-                </button>
-                <button
-                  onClick={() => setShowRapidModal(true)}
-                  className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
-                >
-                  <Target className="w-5 h-5 mr-2" />
-                  Mode Rapide (Séance Auto)
-                </button>
-              </div>
-              <h2 className="text-xl font-bold text-black dark:text-white mb-6">📅 Séances récentes</h2>
-              {sessions.length === 0 ? (
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-8 text-center shadow-md">
-                  <p className="text-gray-500 mb-4">Aucune séance pour le moment</p>
-                  <button
-                    onClick={() => setShowCreateForm(true)}
-                    className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 transition-colors"
+          <div className="bg-white rounded-lg p-6 shadow-md text-center">
+            <div className="flex items-center justify-center mb-4">
+              <BarChart3 className="w-8 h-8 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Volume Total</h3>
+            <div className="text-3xl font-bold text-green-600 mb-2">
+              {getTotalVolume()} tonnes
+            </div>
+            <p className="text-sm text-gray-600">
+              {userStats?.total_reps || 0} répétitions au total
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg p-6 shadow-md text-center">
+            <div className="flex items-center justify-center mb-4">
+              <CheckCircle className="w-8 h-8 text-purple-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Taux de Réussite</h3>
+            <div className="text-3xl font-bold text-purple-600 mb-2">
+              {sessions.length > 0 ? Math.round((getCompletedSessionsCount() / sessions.length) * 100) : 0}%
+            </div>
+            <p className="text-sm text-gray-600">
+              Séances terminées vs créées
+            </p>
+          </div>
+        </div>
+
+        {/* Actions principales */}
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-800">Mes Séances</h2>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Nouvelle Séance
+          </button>
+        </div>
+
+        {/* Formulaire de création de séance */}
+        {showCreateForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <CreateSessionForm
+                onSessionCreated={handleSessionCreated}
+                onCancel={() => setShowCreateForm(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Liste des séances */}
+        <div className="bg-white rounded-lg shadow-md">
+          <div className="p-6 border-b">
+            <h3 className="text-lg font-semibold text-gray-800">Séances Récentes</h3>
+          </div>
+          
+          {sessions.length > 0 ? (
+            <div className="divide-y">
+              {sessions.map((session) => {
+                const status = getSessionStatus(session)
+                return (
+                  <div 
+                    key={session.id} 
+                    className={`p-6 hover:bg-gray-50 transition-colors cursor-pointer ${status.bgColor}`}
+                    onClick={() => router.push(`/session/${session.id}`)}
                   >
-                    Créer votre première séance
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {sessions.map((session) => {
-                    const sessionExercises = exercises.filter(ex => ex.session_id === session.id)
-                    const volumeInfo = calculateVolumeWithType(sessionExercises)
-                    return (
-                      <div
-                        key={session.id}
-                        onClick={() => router.push(`/session/${session.id}`)}
-                        className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow cursor-pointer border border-gray-100 dark:border-gray-800"
-                      >
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="font-semibold text-black dark:text-white">
-                              {formatDate(session.date)}
-                            </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                              {session.objectif}
-                            </p>
-                          </div>
-                          <span className="px-2 py-1 bg-black/10 dark:bg-white/10 text-black dark:text-white text-xs rounded-full">
-                            {sessionExercises.length} exercices
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h4 className="font-medium text-gray-800">
+                            Séance du {formatDate(session.date)}
+                          </h4>
+                          <span className={`px-2 py-1 ${status.color} text-xs rounded-full flex items-center`}>
+                            {status.icon}
+                            <span className="ml-1">{status.status}</span>
                           </span>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600 dark:text-gray-400">Volume total:</span>
-                            <div className="text-right">
-                              <span className="font-medium">{Math.round(volumeInfo.total / 1000)} tonnes</span>
-                              {volumeInfo.hasBodyWeight && (
-                                <div className="text-xs text-gray-500">*Estimation poids du corps</div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600 dark:text-gray-400">Exercices complétés:</span>
-                            <span className="font-medium">
-                              {sessionExercises.filter(ex => ex.completed).length}/{sessionExercises.length}
+                          {session.type && (
+                            <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                              {session.type}
                             </span>
-                          </div>
-                          {session.notes && (
-                            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
-                              <span className="text-blue-600 dark:text-blue-400 italic">"{session.notes}"</span>
-                            </div>
                           )}
                         </div>
+                        
+                        <p className="text-gray-600 mb-2">
+                          Objectif: {session.objectif}
+                        </p>
+                        
+                        {session.completed && (
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <span className="text-gray-600">Volume:</span>
+                              <span className="ml-2 font-medium">
+                                {session.volume_estime ? Math.round(session.volume_estime / 1000) : 0} tonnes
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Reps:</span>
+                              <span className="ml-2 font-medium">
+                                {session.reps_total || 0}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Durée:</span>
+                              <span className="ml-2 font-medium">
+                                {session.duration_estimate || 0} min
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {session.notes && (
+                          <p className="text-sm text-gray-600 mt-2 italic">
+                            &quot;{session.notes}&quot;
+                          </p>
+                        )}
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Onglet Statistiques */}
-          {tab === 1 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md flex flex-col items-center">
-                <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
-                  <TrendingUp className="w-6 h-6 text-black dark:text-white" />
-                </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Volume total</p>
-                <p className="text-2xl font-bold text-black dark:text-white">
-                  {Math.round(getTotalVolume() / 1000)} tonnes
-                </p>
-              </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md flex flex-col items-center">
-                <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
-                  <BarChart2 className="w-6 h-6 text-black dark:text-white" />
-                </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Répétitions</p>
-                <p className="text-2xl font-bold text-black dark:text-white">
-                  {getTotalReps().toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md flex flex-col items-center">
-                <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
-                  <Calendar className="w-6 h-6 text-black dark:text-white" />
-                </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Séances</p>
-                <p className="text-2xl font-bold text-black dark:text-white">
-                  {sessions.length}
-                </p>
-              </div>
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-md flex flex-col items-center">
-                <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
-                  <TrendingUp className="w-6 h-6 text-black dark:text-white" />
-                </div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Streak</p>
-                <p className="text-2xl font-bold text-black dark:text-white">
-                  {getStreak()} jours
-                </p>
-              </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          )}
-
-          {/* Onglet Progression */}
-          {tab === 2 && (
-            <div>
-              <h2 className="text-xl font-bold text-black dark:text-white mb-6">📈 Progression hebdomadaire</h2>
-              <ProgressCharts weeklyStats={weeklyStats} />
+          ) : (
+            <div className="p-8 text-center">
+              <div className="text-4xl mb-4">🏋️</div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                Aucune séance créée
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Commence par créer ta première séance d'entraînement !
+              </p>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Créer ma première séance
+              </button>
             </div>
           )}
         </div>
+
+        {/* Conseils et motivation */}
+        <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 shadow-md">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            💪 Conseils pour bien commencer
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-2">
+              <p className="text-gray-700">
+                <strong>🎯 Commence doucement:</strong> 2-3 séances par semaine suffisent
+              </p>
+              <p className="text-gray-700">
+                <strong>📱 Utilise le Mode Rapide:</strong> Parfait pour débuter
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-gray-700">
+                <strong>⏰ Sois régulier:</strong> Mieux vaut 30 min que 2h occasionnelles
+              </p>
+              <p className="text-gray-700">
+                <strong>📊 Suis ta progression:</strong> Consulte tes statistiques régulièrement
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-
-      {/* Modal de création de séance */}
-      {showCreateForm && (
-        <CreateSessionForm
-          onSessionCreated={handleSessionCreated}
-          onCancel={() => setShowCreateForm(false)}
-        />
-      )}
-
-      {showRapidModal && (
-        <RapidSessionModal
-          open={showRapidModal}
-          onClose={() => setShowRapidModal(false)}
-          onSubmit={handleRapidSessionSubmit}
-          isLoading={isGeneratingRapidSession}
-        />
-      )}
     </div>
   )
 } 

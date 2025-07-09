@@ -11,6 +11,11 @@ export interface Session {
   date: string
   notes?: string
   objectif: string
+  type?: string
+  completed?: boolean
+  duration_estimate?: number
+  volume_estime?: number
+  reps_total?: number
   created_at: string
 }
 
@@ -21,10 +26,33 @@ export interface Exercise {
   type?: string
   sets: number
   reps: number
-  weight: number
+  weight?: number | null
   note?: string
   completed: boolean
   created_at: string
+}
+
+export interface UserStats {
+  id: string
+  user_id: string
+  total_volume: number
+  total_reps: number
+  sessions_completed: number
+  last_session_date?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface UserWeeklyProgress {
+  id: string
+  user_id: string
+  week_number: number
+  year: number
+  volume_week: number
+  reps_week: number
+  sessions_week: number
+  created_at: string
+  updated_at: string
 }
 
 export interface Progression {

@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS public.sessions (
     date DATE NOT NULL,
     notes TEXT,
     objectif TEXT NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    duration_estimate INTEGER,
+    volume_estime DECIMAL(10,2),
+    reps_total INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -27,10 +31,23 @@ CREATE TABLE IF NOT EXISTS public.exercises (
     type TEXT CHECK (type IN ('Poids du corps', 'Charges externes')),
     sets INTEGER NOT NULL,
     reps INTEGER NOT NULL,
-    weight DECIMAL(5,2) NOT NULL,
+    weight DECIMAL(5,2),
     note TEXT,
     completed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Table des statistiques utilisateur
+CREATE TABLE IF NOT EXISTS public.user_stats (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    total_volume DECIMAL(10,2) DEFAULT 0,
+    total_reps INTEGER DEFAULT 0,
+    sessions_completed INTEGER DEFAULT 0,
+    last_session_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
 );
 
 -- Table des progressions (optionnelle pour les statistiques avancées)
@@ -49,12 +66,14 @@ CREATE TABLE IF NOT EXISTS public.progressions (
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON public.sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_date ON public.sessions(date);
 CREATE INDEX IF NOT EXISTS idx_exercises_session_id ON public.exercises(session_id);
+CREATE INDEX IF NOT EXISTS idx_user_stats_user_id ON public.user_stats(user_id);
 CREATE INDEX IF NOT EXISTS idx_progressions_user_id ON public.progressions(user_id);
 
 -- RLS (Row Level Security) - Sécurité au niveau des lignes
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.progressions ENABLE ROW LEVEL SECURITY;
 
 -- Politiques RLS pour les utilisateurs
@@ -117,6 +136,16 @@ CREATE POLICY "Users can delete exercises from own sessions" ON public.exercises
         )
     );
 
+-- Politiques RLS pour les statistiques utilisateur
+CREATE POLICY "Users can view own stats" ON public.user_stats
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own stats" ON public.user_stats
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own stats" ON public.user_stats
+    FOR UPDATE USING (auth.uid() = user_id);
+
 -- Politiques RLS pour les progressions
 CREATE POLICY "Users can view own progressions" ON public.progressions
     FOR SELECT USING (auth.uid() = user_id);
@@ -152,7 +181,7 @@ RETURNS DECIMAL AS $$
 DECLARE
     total_volume DECIMAL := 0;
 BEGIN
-    SELECT COALESCE(SUM(sets * reps * weight), 0)
+    SELECT COALESCE(SUM(sets * reps * COALESCE(weight, 70)), 0)
     INTO total_volume
     FROM public.exercises
     WHERE session_id = session_uuid;
@@ -161,8 +190,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Fonction pour mettre à jour automatiquement updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger pour mettre à jour automatiquement updated_at sur user_stats
+DROP TRIGGER IF EXISTS update_user_stats_updated_at ON public.user_stats;
+CREATE TRIGGER update_user_stats_updated_at
+    BEFORE UPDATE ON public.user_stats
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Commentaires pour la documentation
 COMMENT ON TABLE public.users IS 'Profils utilisateurs étendus';
 COMMENT ON TABLE public.sessions IS 'Séances d''entraînement';
 COMMENT ON TABLE public.exercises IS 'Exercices dans les séances';
+COMMENT ON TABLE public.user_stats IS 'Statistiques globales des utilisateurs';
 COMMENT ON TABLE public.progressions IS 'Statistiques de progression hebdomadaire'; 
