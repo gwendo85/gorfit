@@ -450,7 +450,7 @@ export default function DashboardPage() {
           {/* Onglet Statistiques */}
           {tab === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gradient-to-r from-yellow-100/70 via-orange-100/60 to-pink-100/60 dark:from-yellow-900/70 dark:via-orange-900/60 dark:to-pink-900/60 rounded-lg p-6 shadow-xl border border-white/30 backdrop-blur-md glassmorph flex flex-col items-center transition-colors">
+              <div className="bg-gradient-to-br from-white/80 via-gray-100/70 to-gray-200/60 dark:from-gray-900/80 dark:via-gray-800/70 dark:to-black/60 rounded-lg p-6 shadow-xl border border-white/40 dark:border-gray-700/60 backdrop-blur-md glassmorph flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <TrendingUp className="w-6 h-6 text-black dark:text-white" />
                 </div>
@@ -567,6 +567,7 @@ export default function DashboardPage() {
                           programName={userProgram.program?.name || 'Parcours inconnu'}
                           completedAt={userProgram.completed_at!}
                           isNew={new Date(userProgram.completed_at!).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000}
+                          glass={true}
                         />
                       ))}
                   </div>

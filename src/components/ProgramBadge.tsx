@@ -4,13 +4,15 @@ interface ProgramBadgeProps {
   programName: string
   completedAt: string
   isNew?: boolean
+  glass?: boolean // Ajout de la prop glass
 }
 
-export default function ProgramBadge({ programName, completedAt, isNew = false }: ProgramBadgeProps) {
+export default function ProgramBadge({ programName, completedAt, isNew = false, glass = false }: ProgramBadgeProps) {
   return (
     <div className={
-      `relative bg-gradient-to-r from-purple-600/70 to-blue-600/70 rounded-xl p-4 shadow-xl border border-white/30 backdrop-blur-md ` +
-      'glassmorph'
+      glass
+        ? `relative glassmorph rounded-xl p-4 shadow-xl border border-white/40 dark:border-gray-700/60`
+        : `relative bg-gradient-to-br from-white/80 via-gray-100/70 to-gray-200/60 dark:from-gray-900/80 dark:via-gray-800/70 dark:to-black/60 rounded-xl p-4 shadow-xl border border-white/40 dark:border-gray-700/60 backdrop-blur-md`
     }>
       {isNew && (
         <div className="absolute -top-2 -right-2 bg-red-400/90 text-white text-xs px-3 py-1 rounded-full font-semibold shadow-md border border-white/20">
