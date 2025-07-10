@@ -105,7 +105,7 @@ export default function ChallengesSection() {
   return (
     <div className="space-y-8">
       {/* Section Mes Badges */}
-      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gradient-to-br from-white/70 to-gray-50/60 dark:from-gray-900/70 dark:to-black/60 rounded-xl shadow-xl border border-white/30 backdrop-blur-md glassmorph p-6">
         <div className="flex items-center space-x-3 mb-6">
           <div className="p-2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg">
             <Trophy className="w-6 h-6 text-white" />
@@ -118,7 +118,7 @@ export default function ChallengesSection() {
       </div>
 
       {/* Section Challenges en cours */}
-      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gradient-to-br from-white/70 to-gray-50/60 dark:from-gray-900/70 dark:to-black/60 rounded-xl shadow-xl border border-white/30 backdrop-blur-md glassmorph p-6">
         <div className="flex items-center space-x-3 mb-6">
           <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
             <Target className="w-6 h-6 text-white" />
@@ -158,7 +158,7 @@ export default function ChallengesSection() {
       <AbandonedChallengesSection onChallengeResumed={handleChallengeResumed} />
 
       {/* Section Nouveaux Challenges */}
-      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gradient-to-br from-white/70 to-gray-50/60 dark:from-gray-900/70 dark:to-black/60 rounded-xl shadow-xl border border-white/30 backdrop-blur-md glassmorph p-6">
         <div className="flex items-center space-x-3 mb-6">
           <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
             <Calendar className="w-6 h-6 text-white" />
@@ -194,7 +194,7 @@ export default function ChallengesSection() {
       </div>
 
       {/* Section Classement (optionnel) */}
-      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gradient-to-br from-white/70 to-gray-50/60 dark:from-gray-900/70 dark:to-black/60 rounded-xl shadow-xl border border-white/30 backdrop-blur-md glassmorph p-6">
         <div className="flex items-center space-x-3 mb-6">
           <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg">
             <Users className="w-6 h-6 text-white" />

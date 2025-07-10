@@ -450,7 +450,7 @@ export default function DashboardPage() {
           {/* Onglet Statistiques */}
           {tab === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-pink-100 dark:from-yellow-900 dark:via-orange-900 dark:to-pink-900 rounded-lg p-6 shadow-md flex flex-col items-center transition-colors">
+              <div className="bg-gradient-to-r from-yellow-100/70 via-orange-100/60 to-pink-100/60 dark:from-yellow-900/70 dark:via-orange-900/60 dark:to-pink-900/60 rounded-lg p-6 shadow-xl border border-white/30 backdrop-blur-md glassmorph flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <TrendingUp className="w-6 h-6 text-black dark:text-white" />
                 </div>
@@ -459,7 +459,7 @@ export default function DashboardPage() {
                   {Math.round(getTotalVolume() / 1000)} tonnes
                 </p>
               </div>
-              <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-pink-100 dark:from-yellow-900 dark:via-orange-900 dark:to-pink-900 rounded-lg p-6 shadow-md flex flex-col items-center transition-colors">
+              <div className="bg-gradient-to-r from-yellow-100/70 via-orange-100/60 to-pink-100/60 dark:from-yellow-900/70 dark:via-orange-900/60 dark:to-pink-900/60 rounded-lg p-6 shadow-xl border border-white/30 backdrop-blur-md glassmorph flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <BarChart2 className="w-6 h-6 text-black dark:text-white" />
                 </div>
@@ -468,7 +468,7 @@ export default function DashboardPage() {
                   {getTotalReps().toLocaleString()}
                 </p>
               </div>
-              <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-pink-100 dark:from-yellow-900 dark:via-orange-900 dark:to-pink-900 rounded-lg p-6 shadow-md flex flex-col items-center transition-colors">
+              <div className="bg-gradient-to-r from-yellow-100/70 via-orange-100/60 to-pink-100/60 dark:from-yellow-900/70 dark:via-orange-900/60 dark:to-pink-900/60 rounded-lg p-6 shadow-xl border border-white/30 backdrop-blur-md glassmorph flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <Calendar className="w-6 h-6 text-black dark:text-white" />
                 </div>
@@ -477,7 +477,7 @@ export default function DashboardPage() {
                   {sessions.length}
                 </p>
               </div>
-              <div className="bg-gradient-to-r from-yellow-100 via-orange-100 to-pink-100 dark:from-yellow-900 dark:via-orange-900 dark:to-pink-900 rounded-lg p-6 shadow-md flex flex-col items-center transition-colors">
+              <div className="bg-gradient-to-r from-yellow-100/70 via-orange-100/60 to-pink-100/60 dark:from-yellow-900/70 dark:via-orange-900/60 dark:to-pink-900/60 rounded-lg p-6 shadow-xl border border-white/30 backdrop-blur-md glassmorph flex flex-col items-center transition-colors">
                 <div className="p-2 bg-black/10 dark:bg-white/10 rounded-lg mb-2">
                   <TrendingUp className="w-6 h-6 text-black dark:text-white" />
                 </div>

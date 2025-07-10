@@ -118,7 +118,7 @@ export default function ChallengeCard({
   }
 
   return (
-    <div className={`bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-xl transition-all duration-300 ${
+    <div className={`relative bg-gradient-to-br from-white/70 to-gray-50/60 dark:from-gray-900/70 dark:to-black/60 rounded-xl shadow-xl border border-white/30 backdrop-blur-md glassmorph p-6 hover:shadow-2xl transition-all duration-300 ${
       isAbandoned ? 'opacity-75' : ''
     }`}>
       <div className="flex items-start justify-between mb-4">
