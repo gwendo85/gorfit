@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Challenge, UserChallenge } from '@/types/challenges'
+import { Challenge, UserChallenge } from '@/lib/challengeService'
 import toast from 'react-hot-toast'
 
 export default function ChallengesTest() {
@@ -82,7 +82,7 @@ export default function ChallengesTest() {
                 <p className="text-sm text-gray-600">{challenge.description}</p>
                 <p className="text-xs text-gray-500">
                   Durée: {challenge.duration_days} jours | 
-                  Objectif: {challenge.target_exercises} exercices
+                  Objectif: {challenge.target} {challenge.type}
                 </p>
               </div>
             ))}
@@ -102,7 +102,7 @@ export default function ChallengesTest() {
                 <p className="font-medium">Challenge ID: {userChallenge.challenge_id}</p>
                 <p className="text-sm text-gray-600">Status: {userChallenge.status}</p>
                 <p className="text-xs text-gray-500">
-                  Progression: {userChallenge.current_progress || 0} / {userChallenge.target_progress || 0}
+                  Progression: {userChallenge.progress || 0} / {userChallenge.challenge?.target || 0}
                 </p>
               </div>
             ))}
@@ -116,7 +116,7 @@ export default function ChallengesTest() {
         <p className="text-sm">Challenges: {challenges.length}</p>
         <p className="text-sm">User Challenges: {userChallenges.length}</p>
         <p className="text-sm">Abandoned: {userChallenges.filter(uc => uc.status === 'abandoned').length}</p>
-        <p className="text-sm">Active: {userChallenges.filter(uc => uc.status === 'active').length}</p>
+        <p className="text-sm">Active: {userChallenges.filter(uc => uc.status === 'in_progress').length}</p>
         <p className="text-sm">Completed: {userChallenges.filter(uc => uc.status === 'completed').length}</p>
       </div>
     </div>

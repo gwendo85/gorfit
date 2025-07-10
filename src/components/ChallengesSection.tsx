@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect } from 'react'
 import { Challenge, UserChallenge } from '@/lib/challengeService'
 import { 
