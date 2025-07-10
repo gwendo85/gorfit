@@ -12,6 +12,8 @@ export interface Challenge {
   duration_days: number
   icon_emoji: string
   created_at: string
+  category?: string
+  difficulty_level?: string
 }
 
 export interface UserChallenge {
@@ -192,22 +194,44 @@ export async function getUserChallenges(userId: string): Promise<UserChallenge[]
 // Récupérer les challenges rejoints par un utilisateur
 export async function getJoinedChallenges(userId: string): Promise<UserChallenge[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from('user_challenges')
-    .select(`
-      *,
-      challenge:challenges(*)
-    `)
-    .eq('user_id', userId)
-    .eq('status', 'in_progress')
-    .order('start_date', { ascending: false })
   
-  if (error) {
-    console.error('Erreur lors de la récupération des challenges rejoints:', error)
+  try {
+    console.log('Récupération des challenges rejoints pour l\'utilisateur:', userId)
+    
+    const { data, error } = await supabase
+      .from('user_challenges')
+      .select(`
+        *,
+        challenge:challenges(*)
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'in_progress')
+      .order('start_date', { ascending: false })
+    
+    if (error) {
+      console.error('Erreur lors de la récupération des challenges rejoints:', error)
+      console.error('Code d\'erreur:', error.code)
+      console.error('Message d\'erreur:', error.message)
+      console.error('Détails:', error.details)
+      console.error('Hint:', error.hint)
+      
+      // Afficher un toast d'erreur pour l'utilisateur
+      toast.error(`Erreur lors de la récupération des challenges: ${error.message}`)
+      return []
+    }
+    
+    console.log('Challenges rejoints récupérés:', data?.length || 0)
+    return data || []
+    
+  } catch (error: any) {
+    console.error('Erreur inattendue lors de la récupération des challenges rejoints:', error)
+    console.error('Type d\'erreur:', typeof error)
+    console.error('Message:', error?.message)
+    console.error('Stack:', error?.stack)
+    
+    toast.error('Erreur inattendue lors de la récupération des challenges')
     return []
   }
-  
-  return data || []
 }
 
 // Récupérer les challenges non rejoints par un utilisateur

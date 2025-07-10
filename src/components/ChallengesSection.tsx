@@ -13,6 +13,7 @@ import BadgeDisplay from './BadgeDisplay'
 import AbandonedChallengesSection from './AbandonedChallengesSection'
 import { UserBadge } from '@/types/badges'
 import { Trophy, Target, Calendar, TrendingUp, Users, RotateCcw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 export default function ChallengesSection() {
   const [availableChallenges, setAvailableChallenges] = useState<Challenge[]>([])
@@ -21,6 +22,7 @@ export default function ChallengesSection() {
   const [userBadges, setUserBadges] = useState<UserBadge[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const router = useRouter();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,8 +91,7 @@ export default function ChallengesSection() {
   }
 
   const handleViewDetails = (challenge: Challenge) => {
-    // TODO: Ouvrir un modal avec les détails du challenge
-    console.log('Voir détails:', challenge)
+    router.push(`/challenges/${challenge.id}`)
   }
 
   if (loading) {
@@ -104,9 +105,11 @@ export default function ChallengesSection() {
   return (
     <div className="space-y-8">
       {/* Section Mes Badges */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center space-x-3 mb-6">
-          <Trophy className="w-6 h-6 text-yellow-500" />
+          <div className="p-2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg">
+            <Trophy className="w-6 h-6 text-white" />
+          </div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             Mes Badges
           </h2>
@@ -115,22 +118,26 @@ export default function ChallengesSection() {
       </div>
 
       {/* Section Challenges en cours */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center space-x-3 mb-6">
-          <Target className="w-6 h-6 text-blue-500" />
+          <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+            <Target className="w-6 h-6 text-white" />
+          </div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             Challenges en cours
           </h2>
-          <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full text-sm">
+          <span className="bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm font-medium">
             {joinedChallenges.length}
           </span>
         </div>
         
         {joinedChallenges.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Aucun challenge en cours</p>
-            <p className="text-sm">Rejoins un challenge pour commencer !</p>
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Target className="w-8 h-8 opacity-50" />
+            </div>
+            <p className="text-lg font-medium mb-2">Aucun challenge en cours</p>
+            <p className="text-sm">Rejoins un challenge pour commencer ton aventure !</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -151,22 +158,26 @@ export default function ChallengesSection() {
       <AbandonedChallengesSection onChallengeResumed={handleChallengeResumed} />
 
       {/* Section Nouveaux Challenges */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center space-x-3 mb-6">
-          <Calendar className="w-6 h-6 text-green-500" />
+          <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
+            <Calendar className="w-6 h-6 text-white" />
+          </div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             Nouveaux Challenges
           </h2>
-          <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded-full text-sm">
+          <span className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900 dark:to-emerald-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm font-medium">
             {availableChallenges.length}
           </span>
         </div>
         
         {availableChallenges.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Tous les challenges ont été rejoints !</p>
-            <p className="text-sm">Bravo, tu es un vrai champion !</p>
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trophy className="w-8 h-8 opacity-50" />
+            </div>
+            <p className="text-lg font-medium mb-2">Tous les challenges ont été rejoints !</p>
+            <p className="text-sm">Bravo, tu es un vrai champion ! 🏆</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -183,18 +194,22 @@ export default function ChallengesSection() {
       </div>
 
       {/* Section Classement (optionnel) */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-black rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center space-x-3 mb-6">
-          <Users className="w-6 h-6 text-purple-500" />
+          <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg">
+            <Users className="w-6 h-6 text-white" />
+          </div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             Classement Communautaire
           </h2>
         </div>
         
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>Fonctionnalité à venir</p>
-          <p className="text-sm">Bientôt disponible !</p>
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+          <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Users className="w-8 h-8 opacity-50" />
+          </div>
+          <p className="text-lg font-medium mb-2">Fonctionnalité à venir</p>
+          <p className="text-sm">Bientôt disponible ! 🚀</p>
         </div>
       </div>
     </div>
